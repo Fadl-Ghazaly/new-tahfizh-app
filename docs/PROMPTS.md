@@ -42,19 +42,26 @@ Pastikan npm run build lulus.
 
 ### Fase 1 — Auth & Layout
 ```
-Buat landing page, halaman login (Supabase Auth email+password), middleware proteksi route,
-dan app shell (sidebar 6 menu + topbar) sesuai DESIGN.md dan docs/design/.
-Role admin & user dibaca dari tabel profiles. Sembunyikan menu/aksi admin-only untuk role user.
-Gunakan Context7 untuk dokumentasi @supabase/ssr terbaru.
+Baca semua file di docs/ dan RULES.md.
+Buat landing page, halaman login (Supabase Auth email+password), proxy.ts untuk proteksi route
+(pengganti middleware.ts di Next.js 16), dan app shell (sidebar 6 menu + topbar) sesuai DESIGN.md
+dan docs/design/.
+Role ADMIN & USTADZ dibaca dari tabel profiles. Sembunyikan menu/aksi admin-only untuk role USTADZ.
+Gunakan Context7 untuk dokumentasi @supabase/ssr dan Next.js 16 terbaru.
 ```
 
 ### Fase 2 — Database & Seed
 ```
-Gunakan Supabase MCP. Buat migrasi dari SCHEMA.md (tabel, enum, index, view, RLS, is_admin()).
-Buat lib/quran-data.ts berisi 114 surat (nomor, nama, jumlah ayat, juz awal) dan
-lib/tahfizh.ts (konversi baris/halaman/juz, formatCapaian) beserta unit test sederhana.
-Buat skrip seed sesuai bagian "Seed" di SCHEMA.md. Setelah selesai, verifikasi lewat query:
-jumlah santri=100, ustadz=20, rentang tanggal setoran, sebaran juz capaian 1-25.
+Baca SCHEMA.md (sudah diperbarui sesuai migrasi).
+Migrasi sudah ada di supabase/migrations/. Buat:
+- lib/quran-data.ts berisi 114 surah (nomor, nama, jumlah ayat, juz awal) dari tabel quran_surahs
+- lib/tahfizh.ts (konversi baris/halaman/juz, formatCapaian) beserta unit test
+- Skrip seed di supabase/seed/ sesuai bagian "Aturan Seed" di SCHEMA.md
+  (tabel: teachers, halaqahs, students, attendance, memorization_records).
+  Seed harus idempoten. Hanya buat memorization_records untuk hari hadir (HADIR/TERLAMBAT).
+  Akun demo: admin@darulilmi.test (ADMIN) dan ustadz@darulilmi.test (USTADZ).
+Setelah selesai, verifikasi lewat query:
+jumlah students=100, teachers=20, rentang tanggal, sebaran juz capaian 1-25.
 Laporkan hasil verifikasi.
 ```
 
@@ -67,10 +74,15 @@ tambah/edit/hapus. Verifikasi di browser untuk kedua role.
 
 ### Fase 4 — Input Setoran
 ```
-Bangun menu Input Setoran sesuai PRD 5.3: 3 tab sabaq/sabqi/manzil, filter kelas & ustadz,
-pilih santri, juz 1-30, surat (dropdown 114 surat), validasi ayat terhadap jumlah ayat surat,
-kehadiran, nilai default 100 dengan tombol -5 (counter kesalahan, min 0).
-Jika kehadiran bukan hadir/terlambat maka baris otomatis 0. Tampilkan riwayat setoran terbaru di bawah form.
+Bangun menu Input Setoran sesuai PRD 5.3.
+Form menulis ke DUA tabel: attendance (kehadiran) dan memorization_records (data hafalan).
+3 tab sabaq/sabqi/manzil, filter kelas & ustadz (diturunkan dari halaqahs),
+pilih santri, kehadiran (attendance_status), juz 1-30,
+surah (dropdown 114 surah dari quran_surahs), validasi ayat terhadap ayah_count,
+nilai default 100 dengan tombol -5 (mistake_count naik, fluency_score turun, min 0).
+Jika kehadiran bukan HADIR/TERLAMBAT maka hanya record attendance yang dibuat
+(tanpa memorization_records). line_count harus 1-300.
+Tampilkan riwayat setoran terbaru di bawah form.
 ```
 
 ### Fase 5 — Laporan Bulanan + PDF

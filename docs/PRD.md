@@ -8,8 +8,8 @@ Aplikasi web pencatatan tahfidz santri Pesantren Darul Ilmi dengan metode **Saba
 - **Hanya SABAQ yang menambah capaian hafalan baru.** Sabqi & manzil hanya dihitung untuk statistik aktivitas.
 - Konversi: **15 baris = 1 halaman**, **20 halaman = 1 juz** → **1 juz = 300 baris**. Target 30 juz = 600 halaman = 9.000 baris.
 - Format tampilan capaian: `X juz, Y halaman` (contoh: 22 halaman → `1 juz, 2 halaman`; 15 halaman → `0 juz, 15 halaman`). Gunakan util `formatCapaian(totalBaris)`.
-- Nilai kelancaran: default **100**, tombol **−5** per kesalahan (min 0). Simpan juga `jumlah_kesalahan`.
-- Kehadiran: `hadir | izin | terlambat | alpha | sakit`. Dihitung "hadir" = hadir + terlambat. Tidak hadir = izin + alpha + sakit. Jika tidak hadir, baris = 0.
+- Nilai kelancaran (`fluency_score`): default **100**, tombol **−5** per kesalahan (min 0). Simpan juga `mistake_count`.
+- Kehadiran (`attendance.status`): `HADIR | IZIN | TERLAMBAT | ALPHA | SAKIT`. Dihitung "hadir" = HADIR + TERLAMBAT. Tidak hadir = IZIN + ALPHA + SAKIT. Jika tidak hadir, **tidak** dibuat record setoran (`memorization_records`), hanya record kehadiran (`attendance`).
 - Progress % = total baris sabaq / 9000 × 100.
 - Juz dianggap "sudah dihafal" jika total baris sabaq pada juz tsb ≥ 300 (toleransi diatur di konstanta).
 - Ranking = urut total baris sabaq kumulatif (terbanyak = rank 1).
@@ -17,21 +17,28 @@ Aplikasi web pencatatan tahfidz santri Pesantren Darul Ilmi dengan metode **Saba
 ## 3. Role
 | Role | Hak akses |
 |---|---|
-| admin | Semua menu, CRUD, pengaturan |
-| user (ustadz/viewer) | Lihat semua, input setoran, lihat laporan & dashboard; **tidak** boleh hapus data master & pengaturan |
+| ADMIN | Semua menu, CRUD semua data, pengaturan, hapus data |
+| USTADZ | Lihat semua data (ranking & dashboard), input kehadiran + setoran **hanya untuk halaqah sendiri**; **tidak** boleh hapus data, CRUD master, atau ubah pengaturan |
+
+> Semua user login (ADMIN maupun USTADZ) boleh **melihat** seluruh data santri, setoran, dan kehadiran untuk keperluan ranking dan dashboard. Menulis hanya sesuai hak di atas.
 
 ## 4. Alur Halaman
-Landing page → Login (admin/user) → Dashboard.
+Landing page → Login (ADMIN/USTADZ) → Dashboard.
 
 ## 5. Menu & Fitur
 ### 5.1 Data Santri
-CRUD. Kolom: No, Nama, JK, Kelas (7–12), Kelas Halaqah, NISN, Ustadz Pengampu, Orangtua, WA Orangtua. Filter kelas. Seed **100** santri.
+CRUD (hanya ADMIN). Kolom: No, Nama (`students.name`), JK (`gender`), Kelas (`class_id` → `classes`), Kelas Halaqah (`halaqah_id` → `halaqahs.name`), NISN (`nisn`), Ustadz Pengampu (diturunkan dari `halaqahs.teacher_id` → `teachers.name`), Orangtua (`parent_name`), WA Orangtua (`parent_whatsapp`). Filter kelas. Seed **100** santri.
 
 ### 5.2 Data Ustadz
-CRUD. Kolom: No, Nama, JK, No WA, Asal Pondok. Filter kelas (kelas yang diampu). Seed **20** ustadz.
+CRUD (hanya ADMIN). Kolom: No, Nama (`teachers.name`), JK (`gender`), No WA (`whatsapp`, wajib diisi), Asal Pondok (`boarding_school`). Filter kelas diturunkan dari `halaqahs.class_id` (bukan kolom langsung di teachers). Seed **20** ustadz.
 
 ### 5.3 Input Setoran
-Tab: Sabaq | Sabqi | Manzil. Filter: kelas, ustadz pengampu. Field: tanggal, santri, juz (1–30), surat (114 surat), ayat mulai, ayat selesai, jumlah baris, catatan, kehadiran, nilai kelancaran (tombol −5). Validasi ayat selesai ≥ ayat mulai ≤ jumlah ayat surat.
+Form setoran **menulis ke dua tabel**: `attendance` (kehadiran) + `memorization_records` (data hafalan).
+
+Tab: Sabaq | Sabqi | Manzil. Filter: kelas, ustadz pengampu (diturunkan dari halaqah). Field: tanggal, santri, kehadiran (`attendance_status`), juz (1–30), surat (114 surah dari `quran_surahs`), ayat mulai, ayat selesai, jumlah baris (`line_count`, 1–300), catatan, nilai kelancaran (`fluency_score`, tombol −5). Validasi ayat selesai ≥ ayat mulai ≤ jumlah ayat surah.
+
+Jika status kehadiran bukan HADIR/TERLAMBAT, **hanya** record `attendance` yang dibuat (tanpa `memorization_records`).
+
 Seed: data harian 1 tahun s.d. hari ini, variasi capaian santri **1–25 juz**.
 
 ### 5.4 Laporan Bulanan (per santri)
@@ -57,11 +64,11 @@ Filter: bulan, kelas halaqah, ustadz. Berisi:
 - Distribusi hafalan: 0–1, 2–5, 5–10, 10–20, 20–30 juz (**tetapkan batas tegas tanpa tumpang tindih: 0–1, 2–5, 6–10, 11–20, 21–30**)
 - Tampilan penuh warna (palet chart beragam)
 
-### 5.6 Pengaturan (admin)
-Ubah nama pesantren, upload logo, pilih 1 dari 6 tema (lihat DESIGN.md). Tersimpan di DB dan diterapkan global.
+### 5.6 Pengaturan (ADMIN only)
+Ubah nama pesantren (`school_settings.school_name`), upload logo (`logo_url`, Supabase Storage), pilih 1 dari 6 tema (`theme`: 'theme-1' s.d. 'theme-6', lihat DESIGN.md). Tersimpan di tabel `school_settings` (dijamin 1 baris) dan diterapkan global.
 
 ## 6. Non-Fungsional
 Responsif (HP/tablet/desktop), bahasa UI Indonesia, loading & empty state di semua halaman, performa dashboard < 2 dtk (gunakan SQL view/agregasi di DB).
 
 ## 7. Definisi Selesai
-Seed berjalan satu perintah, semua menu berfungsi, role dibatasi, PDF terunduh, tema berganti, build tanpa error.
+Seed berjalan satu perintah (idempoten), semua menu berfungsi, role ADMIN/USTADZ dibatasi sesuai RLS, PDF terunduh, tema berganti, build tanpa error.

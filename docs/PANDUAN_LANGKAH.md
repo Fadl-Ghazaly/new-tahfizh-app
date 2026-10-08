@@ -129,9 +129,9 @@ SUPABASE_SERVICE_ROLE_KEY=isi_service_role_key
 ### 2.5 Buat dua akun demo
 Authentication → Users → **Add user** (centang auto-confirm):
 - [ ] `admin@darulilmi.test` / password kuat
-- [ ] `user@darulilmi.test` / password kuat
+- [ ] `ustadz@darulilmi.test` / password kuat
 
-(Baris `profiles` + role dibuat oleh migrasi/seed di Tahap 5.)
+(Baris `profiles` + role ADMIN/USTADZ dibuat oleh migrasi/seed di Tahap 5.)
 
 ---
 
@@ -206,9 +206,9 @@ Prompt: Fase 1. **Cek:**
 
 ### Fase 2 — Database, Seed, Logika Inti (±4 jam)
 Prompt: Fase 2 (aktifkan Supabase MCP tanpa `--read-only`). Hasil yang harus ada:
-- `supabase/migrations/*.sql` (tabel, enum, index, view, RLS, `is_admin()`)
-- `src/lib/quran-data.ts` (114 surat), `src/lib/tahfizh.ts` + test
-- `supabase/seed/seed.ts` memakai `SUPABASE_SERVICE_ROLE_KEY`, membuat 20 ustadz, halaqah, 100 santri, setoran 1 tahun, dan mengisi `profiles` untuk 2 akun demo (admin & user)
+- `supabase/migrations/*.sql` (tabel, enum, index, RLS, fungsi — sudah dibuat)
+- `lib/quran-data.ts` (114 surah), `lib/tahfizh.ts` + test
+- `supabase/seed/seed.ts` memakai `SUPABASE_SERVICE_ROLE_KEY`, membuat 20 teachers, halaqahs, 100 students, attendance + memorization_records 1 tahun, dan mengisi `profiles` untuk 2 akun demo (ADMIN & USTADZ)
 
 Jalankan seed:
 ```
@@ -216,11 +216,12 @@ npm run seed
 ```
 **Cek di Supabase → Table Editor / SQL Editor:**
 ```sql
-select count(*) from santri;      -- 100
-select count(*) from ustadz;      -- 20
-select min(tanggal), max(tanggal) from setoran;
-select santri_id, sum(jumlah_baris)/300.0 as juz
-from setoran where jenis='sabaq' group by 1 order by 2 desc limit 5; -- ada yang mendekati 25
+select count(*) from students;      -- 100
+select count(*) from teachers;      -- 20
+select min(date), max(date) from memorization_records;
+select student_id, sum(line_count)/300.0 as juz
+from memorization_records where type='SABAQ' and status='ACTIVE'
+group by 1 order by 2 desc limit 5; -- ada yang mendekati 25
 ```
 - [ ] Jalankan `npm test` → util konversi lulus (contoh: 330 baris = 22 halaman = `1 juz, 2 halaman`).
 - [ ] Jalankan seed dua kali → tidak membuat duplikat (seed harus idempoten: hapus & isi ulang).
@@ -229,7 +230,7 @@ from setoran where jenis='sabaq' group by 1 order by 2 desc limit 5; -- ada yang
 **Cek:**
 - [ ] 100 santri tampil dengan pagination; filter kelas 7–12 bekerja
 - [ ] Tambah, edit, hapus (dengan konfirmasi) berhasil sebagai admin
-- [ ] Login sebagai `user`: tombol tambah/edit/hapus tidak muncul **dan** gagal bila dipanggil langsung (RLS)
+- [ ] Login sebagai `ustadz`: tombol tambah/edit/hapus tidak muncul **dan** gagal bila dipanggil langsung (RLS)
 - [ ] Ustadz: 20 data, filter kelas, CRUD berfungsi
 
 ### Fase 4 — Input Setoran (±4 jam)
@@ -316,9 +317,9 @@ Supabase → Authentication → **URL Configuration**:
 
 - [ ] **Hapus data dummy:** jalankan di SQL Editor (hati-hati, tidak bisa dibatalkan)
   ```sql
-  truncate table setoran, santri, halaqah, ustadz restart identity cascade;
+  truncate table memorization_records, attendance, students, halaqahs, teachers restart identity cascade;
   ```
-- [ ] **Ganti akun demo:** hapus `admin@darulilmi.test` dan `user@darulilmi.test`, buat akun asli dengan password kuat; atur role di tabel `profiles`.
+- [ ] **Ganti akun demo:** hapus `admin@darulilmi.test` dan `ustadz@darulilmi.test`, buat akun asli dengan password kuat; atur role di tabel `profiles` (ADMIN/USTADZ).
 - [ ] Isi data asli santri/ustadz lewat menu CRUD (atau impor CSV via Table Editor Supabase).
 - [ ] Atur nama, logo, tema pesantren di menu Pengaturan.
 - [ ] Aktifkan kembali **Confirm email** bila ingin pendaftaran terverifikasi.
@@ -333,10 +334,10 @@ Supabase → Authentication → **URL Configuration**:
 | Masalah | Penyebab umum | Solusi |
 |---|---|---|
 | `npm run build` gagal tipe | Tipe `any`/props salah | Salin pesan error ke agent: "perbaiki akar masalah, jangan ubah fitur lain" |
-| Login berhasil tapi langsung terlempar | Cookie/middleware salah atau `profiles` kosong | Cek baris `profiles` untuk user; minta agent audit `middleware.ts` |
+| Login berhasil tapi langsung terlempar | Cookie/proxy.ts salah atau `profiles` kosong | Cek baris `profiles` untuk user; minta agent audit `proxy.ts` |
 | Data kosong padahal ada di DB | RLS memblokir `select` | Cek Policies; pastikan policy select untuk user terautentikasi |
 | Seed gagal "permission denied" | Memakai anon key | Seed harus memakai `SUPABASE_SERVICE_ROLE_KEY` |
-| Angka laporan ≠ dashboard | Logika hitung terduplikasi | Paksa semua memakai `lib/tahfizh.ts` / view yang sama |
+| Angka laporan ≠ dashboard | Logika hitung terduplikasi | Paksa semua memakai `lib/tahfizh.ts` / view yang sama; pastikan filter `status = 'ACTIVE'` |
 | Logo tidak tampil | Bucket Storage tidak publik / policy | Jadikan bucket publik atau buat policy baca |
 | Di Vercel error env | Variabel belum diisi | Settings → Environment Variables → isi → Redeploy |
 | Agent "lupa" aturan | Sesi terlalu panjang | Mulai sesi baru, suruh baca `RULES.md` + `docs/` |
