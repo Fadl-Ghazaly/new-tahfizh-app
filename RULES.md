@@ -38,3 +38,14 @@
 
 ## Definisi Selesai (per fitur)
 Fungsi sesuai PRD, tanpa error konsol, lint & build lulus, tampil baik di HP dan desktop, diuji untuk role admin dan user.
+
+## Stack Terpasang (WAJIB diikuti, bukan versi di dokumen lama)
+- Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4 (konfigurasi di app/globals.css, bukan tailwind.config.js).
+- shadcn/ui berbasis **Base UI** (bukan Radix): komposisi memakai prop `render`, bukan `asChild`.
+  Selalu baca file di components/ui/ sebelum memakainya.
+- Komponen form: gunakan `field` + react-hook-form `Controller` (komponen `form` lama tidak tersedia).
+- Next.js 16: `params`/`searchParams`/`cookies()`/`headers()` bersifat async (gunakan await).
+  Gunakan `proxy.ts` (pengganti `middleware.ts`) untuk proteksi route; verifikasi di dokumentasi.
+- Supabase: @supabase/ssr. Tabel & kolom memakai nama di supabase/migrations (bahasa Inggris, role ADMIN/USTADZ);
+  migrasi adalah sumber kebenaran. docs/SCHEMA.md hanya referensi awal.
+- Selalu gunakan Context7 untuk dokumentasi library sebelum menulis kode.
