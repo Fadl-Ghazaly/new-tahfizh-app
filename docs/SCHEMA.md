@@ -467,6 +467,8 @@ Semua tabel memiliki RLS aktif. Berikut kondisi akhir setelah semua migrasi:
 
 > Semua view harus memfilter `memorization_records.status = 'ACTIVE'` untuk mengabaikan record VOID.
 
+Semua view dibuat dengan security_invoker = true agar RLS tabel dasar tetap berlaku.
+
 ---
 
 ## 11. Aturan Seed (untuk skrip `supabase/seed/`)

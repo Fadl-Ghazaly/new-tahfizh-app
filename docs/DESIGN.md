@@ -50,3 +50,11 @@ Empty state ilustratif, skeleton loading, toast sukses/gagal, konfirmasi sebelum
 
 ## Prompt untuk Google Stitch
 Lihat `PROMPTS.md` bagian "Stitch".
+
+Nilai DB	Tema
+theme-1	Zamrud (default)
+theme-2	Samudra
+theme-3	Ungu Royal
+theme-4	Senja
+theme-5	Mawar
+theme-6	Malam
