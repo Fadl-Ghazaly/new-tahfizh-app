@@ -710,8 +710,31 @@ function printDryRunStatistics(data: ReturnType<typeof generateSeedData>) {
   console.log(`• Total Sabaq Median     : ${medianSabaq} baris (${formatCapaian(medianSabaq)})`);
   console.log(`• Total Sabaq Maksimum   : ${maxSabaq} baris (${formatCapaian(maxSabaq)}) [<= 7500 baris: ${maxSabaq <= 7500 ? 'LULUS' : 'GAGAL'}]`);
 
-  console.log('\n--- 6. DISTRIBUSI TOTAL JUZ SANTRI (SUM SABAQ / 300) ---');
-  const juzGroups = {
+  console.log('\n--- 6. PROFIL KECEPATAN (TARGET PEMBANGKITAN) ---');
+  const speedProfiles = [
+    { label: '1 - 2 juz (very_slow)', target: 10, actual: 0 },
+    { label: '3 - 6 juz (slow)', target: 30, actual: 0 },
+    { label: '7 - 12 juz (moderate)', target: 30, actual: 0 },
+    { label: '13 - 20 juz (fast)', target: 20, actual: 0 },
+    { label: '21 - 25 juz (very_fast)', target: 10, actual: 0 },
+  ];
+
+  for (const s of data.studentStates) {
+    if (s.speedCategory === 'very_slow') speedProfiles[0].actual++;
+    else if (s.speedCategory === 'slow') speedProfiles[1].actual++;
+    else if (s.speedCategory === 'moderate') speedProfiles[2].actual++;
+    else if (s.speedCategory === 'fast') speedProfiles[3].actual++;
+    else if (s.speedCategory === 'very_fast') speedProfiles[4].actual++;
+  }
+
+  for (const p of speedProfiles) {
+    console.log(
+      `• Kelompok ${p.label.padEnd(25)}: ${p.actual.toString().padStart(3)} santri (target: ~${p.target})`
+    );
+  }
+
+  console.log('\n--- 7. DISTRIBUSI DASHBOARD (FLOOR(TOTAL_BARIS / 300)) ---');
+  const dashboardGroups = {
     '0 - 1 juz': 0,
     '2 - 5 juz': 0,
     '6 - 10 juz': 0,
@@ -720,19 +743,22 @@ function printDryRunStatistics(data: ReturnType<typeof generateSeedData>) {
   };
 
   for (const s of data.studentStates) {
-    const juzEarned = s.totalSabaqLines / BARIS_PER_JUZ;
-    if (juzEarned <= 1.99) juzGroups['0 - 1 juz']++;
-    else if (juzEarned <= 5.99) juzGroups['2 - 5 juz']++;
-    else if (juzEarned <= 10.99) juzGroups['6 - 10 juz']++;
-    else if (juzEarned <= 20.99) juzGroups['11 - 20 juz']++;
-    else juzGroups['21 - 30 juz']++;
+    const juzEarned = Math.floor(s.totalSabaqLines / BARIS_PER_JUZ);
+    if (juzEarned <= 1) dashboardGroups['0 - 1 juz']++;
+    else if (juzEarned <= 5) dashboardGroups['2 - 5 juz']++;
+    else if (juzEarned <= 10) dashboardGroups['6 - 10 juz']++;
+    else if (juzEarned <= 20) dashboardGroups['11 - 20 juz']++;
+    else dashboardGroups['21 - 30 juz']++;
   }
 
-  Object.entries(juzGroups).forEach(([grp, cnt]) => {
+  let totalDashboard = 0;
+  Object.entries(dashboardGroups).forEach(([grp, cnt]) => {
+    totalDashboard += cnt;
     console.log(`• Kelompok ${grp.padEnd(12)}: ${cnt.toString().padStart(3)} santri`);
   });
+  console.log(`• Total Santri        : ${totalDashboard.toString().padStart(3)} santri`);
 
-  console.log('\n--- 7. RENTANG NOMOR SURAT PER JUZ YANG TERSENTUH ---');
+  console.log('\n--- 8. RENTANG NOMOR SURAT PER JUZ YANG TERSENTUH ---');
   const juzSurahRanges = new Map<number, { minSurah: number; maxSurah: number; count: number }>();
   for (const r of data.memorizationRecords) {
     const existing = juzSurahRanges.get(r.juz);
@@ -752,7 +778,7 @@ function printDryRunStatistics(data: ReturnType<typeof generateSeedData>) {
     console.log(`• Juz ${j.toString().padStart(2)}: Surah ${info.minSurah.toString().padStart(3)} s.d. ${info.maxSurah.toString().padStart(3)} (${info.count.toString().padStart(5)} record)`);
   }
 
-  console.log('\n--- 8. 5 SANTRI DENGAN TOTAL TERTINGGI ---');
+  console.log('\n--- 9. 5 SANTRI DENGAN TOTAL TERTINGGI ---');
   const sortedStudents = [...data.studentStates].sort(
     (a, b) => b.totalSabaqLines - a.totalSabaqLines
   );
@@ -763,7 +789,7 @@ function printDryRunStatistics(data: ReturnType<typeof generateSeedData>) {
     );
   });
 
-  console.log('\n--- 9. SANTRI DENGAN AKTIVITAS MENURUN DI BULAN BERJALAN ---');
+  console.log('\n--- 10. SANTRI DENGAN AKTIVITAS MENURUN DI BULAN BERJALAN ---');
   const slumpingCount = data.studentStates.filter((s) => s.isSlumping).length;
   console.log(`• Jumlah santri "butuh perhatian": ${slumpingCount} santri (siap untuk uji filter dashboard)`);
 
