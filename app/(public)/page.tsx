@@ -1,16 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
-import { connection } from "next/server";
+import { getPublicSchoolSettings } from "@/lib/settings";
 import Link from "next/link";
 
-export const instant = false;
+
 
 export default async function LandingPage() {
-  await connection();
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("get_public_school_settings");
-
-  const schoolName = data && data.length > 0 ? data[0].school_name : "Pesantren Darul Ilmi";
-  const logoUrl = data && data.length > 0 ? data[0].logo_url : null;
+  const { school_name: schoolName, logo_url: logoUrl } = await getPublicSchoolSettings();
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">

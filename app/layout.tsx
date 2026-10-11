@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { createClient } from "@/lib/supabase/server";
-import { connection } from "next/server";
 import { Toaster } from "sonner";
+import { getPublicSchoolSettings } from "@/lib/settings";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -15,21 +14,12 @@ export const metadata: Metadata = {
   description: "Aplikasi Manajemen Tahfizh",
 };
 
-export const instant = false;
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await connection();
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_public_school_settings");
-  
-  let theme = "theme-1";
-  if (!error && data && data.length > 0) {
-    theme = data[0].theme || "theme-1";
-  }
+  const { theme } = await getPublicSchoolSettings();
 
   return (
     <html lang="id" data-theme={theme} className={`${jakarta.variable} h-full antialiased`} suppressHydrationWarning>

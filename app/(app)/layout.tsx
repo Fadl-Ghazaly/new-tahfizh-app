@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { MobileNav } from '@/components/layout/mobile-nav';
+import { getPublicSchoolSettings } from '@/lib/settings';
 
+// instant = false dipertahankan: layout memerlukan auth gating dan pembacaan cookie sesi pengguna (auth.getUser) di puncak pohon layout.
 export const instant = false;
 
 export default async function AppLayout({
@@ -43,11 +45,10 @@ export default async function AppLayout({
     redirect('/login?error=inactive');
   }
 
-  // 3. Ambil pengaturan sekolah via RPC yang sudah ada
-  const { data: settingsRows } = await supabase.rpc('get_public_school_settings');
-  const settings = settingsRows && settingsRows.length > 0 ? settingsRows[0] : null;
-  const schoolName = settings?.school_name ?? 'Pesantren Darul Ilmi';
-  const logoUrl = settings?.logo_url ?? null;
+  // 3. Ambil pengaturan sekolah via cache
+  const settings = await getPublicSchoolSettings();
+  const schoolName = settings.school_name;
+  const logoUrl = settings.logo_url;
 
   const userName = profile.full_name;
   const role = profile.role as string;

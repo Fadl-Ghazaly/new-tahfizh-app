@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   description: 'Pengaturan aplikasi pesantren.',
 };
 
+// instant = false dipertahankan: halaman memeriksa role ADMIN di server-side sebelum merender konten formulir.
 export const instant = false;
 
 export default async function PengaturanPage() {

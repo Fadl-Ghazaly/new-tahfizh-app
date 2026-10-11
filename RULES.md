@@ -39,7 +39,9 @@
 ## Definisi Selesai (per fitur)
 Fungsi sesuai PRD, tanpa error konsol, lint & build lulus, tampil baik di HP dan desktop, diuji untuk role admin dan user.
 
-## Stack Terpasang (WAJIB diikuti, bukan versi di dokumen lama)
+## Stack Terpasang
+
+- Next.js 16 (Cache Components, instant navigation): komponen halaman sinkron; pembacaan data per-request (cookies, headers, searchParams, connection(), query Supabase dengan sesi) berada di komponen anak async yang dibungkus <Suspense> sedekat mungkin dengan data; data publik yang tidak bergantung request (mis. pengaturan sekolah) memakai "use cache" + cacheTag; `export const instant = false` hanya untuk segmen yang butuh data request di puncak pohon (auth gating), wajib berkomentar alasan, dan dilarang dipakai untuk membungkam error. (WAJIB diikuti, bukan versi di dokumen lama)
 - Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4 (konfigurasi di app/globals.css, bukan tailwind.config.js).
 - shadcn/ui berbasis **Base UI** (bukan Radix): komposisi memakai prop `render`, bukan `asChild`.
   Selalu baca file di components/ui/ sebelum memakainya.
@@ -49,3 +51,6 @@ Fungsi sesuai PRD, tanpa error konsol, lint & build lulus, tampil baik di HP dan
 - Supabase: @supabase/ssr. Tabel & kolom memakai nama di supabase/migrations (bahasa Inggris, role ADMIN/USTADZ);
   migrasi adalah sumber kebenaran. docs/SCHEMA.md hanya referensi awal.
 - Selalu gunakan Context7 untuk dokumentasi library sebelum menulis kode.
+- Next.js 16 (Cache Components): komponen halaman sinkron dan statis. Semua pembacaan data per-request
+  (cookies, headers, searchParams, connection(), query Supabase) berada di komponen anak async yang dibungkus
+  <Suspense> dengan skeleton. Dilarang memakai `export const instant = false` untuk membungkam error.
