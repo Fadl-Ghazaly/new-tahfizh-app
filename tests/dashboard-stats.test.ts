@@ -9,9 +9,46 @@ import {
   formatCapaianDenganBaris,
   DashboardQueryError,
 } from '../lib/dashboard-utils';
+import {
+  getDashboardSummary,
+  getTopTenBest,
+  getJuzDistribution,
+} from '../lib/queries/dashboard';
 
-// Mock server-only agar lib/queries/dashboard bisa diuji di lingkungan Vitest
+// Mock server-only
 vi.mock('server-only', () => ({}));
+
+// State tiruan dengan vi.hoisted
+const { mockQueryState } = vi.hoisted(() => {
+  return {
+    mockQueryState: {
+      data: null as unknown,
+      error: null as { message: string } | null,
+    },
+  };
+});
+
+// Pembangun kueri generik yang mengembalikan dirinya sendiri dan menyelesaikan via promise/thenable
+const createMockBuilder = () => {
+  const builder: Record<string, unknown> = {
+    select: () => builder,
+    order: () => builder,
+    limit: () => builder,
+    eq: () => builder,
+    in: () => builder,
+    single: () => Promise.resolve({ data: mockQueryState.data, error: mockQueryState.error }),
+    then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: mockQueryState.data, error: mockQueryState.error }).then(resolve),
+  };
+  return builder;
+};
+
+const mockFrom = vi.fn(() => createMockBuilder());
+
+vi.mock('../lib/supabase/server', () => ({
+  createClient: vi.fn(async () => ({
+    from: mockFrom,
+  })),
+}));
 
 describe('Dashboard Pure Calculation Utilities', () => {
   describe('computeTargetAchievement (Pie Target)', () => {
@@ -37,7 +74,6 @@ describe('Dashboard Pure Calculation Utilities', () => {
     });
 
     it('pembulatan persentase ke 1 desimal', () => {
-      // 1000 baris / 900000 = 0.1111% -> 0.1%
       const res = computeTargetAchievement(1000, 100);
       expect(res.percentage).toBe(0.1);
     });
@@ -58,17 +94,15 @@ describe('Dashboard Pure Calculation Utilities', () => {
     it('menghitung median genap sebagai rata-rata dari dua elemen tengah', () => {
       const data = [1000, 2000, 4000, 5000];
       const res = computeMemorizationStats(data);
-      expect(res.median_lines).toBe(3000); // (2000 + 4000) / 2
+      expect(res.median_lines).toBe(3000);
     });
 
     it('menguji batas 3000 dan 3001: tepat 3000 TIDAK dihitung, 3001 dihitung di atas 10 juz', () => {
       const with3000 = [1000, 2000, 3000];
-      const res1 = computeMemorizationStats(with3000);
-      expect(res1.students_above_10_juz).toBe(0);
+      expect(computeMemorizationStats(with3000).students_above_10_juz).toBe(0);
 
       const with3001 = [1000, 2000, 3001];
-      const res2 = computeMemorizationStats(with3001);
-      expect(res2.students_above_10_juz).toBe(1);
+      expect(computeMemorizationStats(with3001).students_above_10_juz).toBe(1);
     });
 
     it('mengurutkan salinan array: input acak menghasilkan median benar dan array asli tidak bermutasi', () => {
@@ -76,7 +110,7 @@ describe('Dashboard Pure Calculation Utilities', () => {
       const copy = [...unsorted];
       const res = computeMemorizationStats(unsorted);
       expect(res.median_lines).toBe(3000);
-      expect(unsorted).toEqual(copy); // tidak termutasi
+      expect(unsorted).toEqual(copy);
     });
 
     it('daftar kosong aman dan mengembalikan nilai 0', () => {
@@ -96,7 +130,7 @@ describe('Dashboard Pure Calculation Utilities', () => {
         { day: 3, sabaq: 200 },
         { day: 4, sabaq: 250 },
       ];
-      expect(sumDailyLinesUntil(rows, 3)).toBe(450); // 100 + 150 + 200
+      expect(sumDailyLinesUntil(rows, 3)).toBe(450);
     });
 
     it('sumDailyLinesUntil aman bila N melebihi jumlah hari bulan lalu (mis. N=31 vs 28 hari Februari)', () => {
@@ -182,30 +216,75 @@ describe('Dashboard Pure Calculation Utilities', () => {
   });
 });
 
-import { getDashboardSummary } from '../lib/queries/dashboard';
+describe('DashboardQueryError Handling in Query Functions (Success & Error)', () => {
+  it('getDashboardSummary sukses mengembalikan data dan error melempar DashboardQueryError', async () => {
+    // Jalur sukses
+    mockQueryState.data = { total_students: 10, total_teachers: 2, total_halaqahs: 2, total_sabaq_lines: 5000 };
+    mockQueryState.error = null;
+    const res = await getDashboardSummary();
+    expect(res.total_students).toBe(10);
+    expect(res.total_sabaq_lines).toBe(5000);
 
-const mockFrom = vi.fn();
-vi.mock('../lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({
-    from: mockFrom,
-  })),
-}));
-
-
-describe('DashboardQueryError Handling in Query Functions', () => {
-  it('melempar DashboardQueryError berisi nama view dan tidak mengembalikan 0 saat error', async () => {
-    const mockSingle = vi.fn().mockResolvedValueOnce({
-      data: null,
-      error: { message: 'relation v_dashboard_summary does not exist' },
-    });
-    const mockSelect = vi.fn().mockReturnValueOnce({
-      single: mockSingle,
-    });
-    mockFrom.mockReturnValueOnce({
-      select: mockSelect,
-    });
-
+    // Jalur error
+    mockQueryState.data = null;
+    mockQueryState.error = { message: 'db error summary' };
     await expect(getDashboardSummary()).rejects.toThrow(DashboardQueryError);
     await expect(getDashboardSummary()).rejects.toThrow(/v_dashboard_summary/);
+    await expect(getDashboardSummary()).rejects.toThrow(/db error summary/);
+  });
+
+  it('getTopTenBest sukses mengembalikan daftar dan error melempar DashboardQueryError', async () => {
+    // Jalur sukses
+    mockQueryState.data = [{
+      student_id: '1',
+      student_name: 'Ahmad',
+      nisn: '12345',
+      gender: 'L',
+      class_id: 'c1',
+      class_name: '7A',
+      class_level: 7,
+      halaqah_id: 'h1',
+      halaqah_name: 'Halaqah 1',
+      teacher_name: 'Ust. Zaid',
+      total_sabaq_lines: 1000,
+      avg_fluency_score: 95,
+      total_juz_floor: 3,
+      ranking: 1,
+    }];
+    mockQueryState.error = null;
+    const res = await getTopTenBest();
+    expect(res.length).toBe(1);
+    expect(res[0].student_name).toBe('Ahmad');
+    expect(res[0].formatted_capaian).toBe('3 juz, 6 halaman');
+
+    // Jalur error
+    mockQueryState.data = null;
+    mockQueryState.error = { message: 'db error rankings' };
+    await expect(getTopTenBest()).rejects.toThrow(DashboardQueryError);
+    await expect(getTopTenBest()).rejects.toThrow(/v_student_rankings/);
+    await expect(getTopTenBest()).rejects.toThrow(/db error rankings/);
+  });
+
+  it('getJuzDistribution sukses mengembalikan data dan error melempar DashboardQueryError', async () => {
+    // Jalur sukses
+    mockQueryState.data = {
+      group_0_1: 10,
+      group_2_5: 20,
+      group_6_10: 15,
+      group_11_20: 5,
+      group_21_30: 2,
+      total_students: 52,
+    };
+    mockQueryState.error = null;
+    const res = await getJuzDistribution();
+    expect(res.total_students).toBe(52);
+    expect(res.group_0_1).toBe(10);
+
+    // Jalur error
+    mockQueryState.data = null;
+    mockQueryState.error = { message: 'db error distribution' };
+    await expect(getJuzDistribution()).rejects.toThrow(DashboardQueryError);
+    await expect(getJuzDistribution()).rejects.toThrow(/v_juz_distribution/);
+    await expect(getJuzDistribution()).rejects.toThrow(/db error distribution/);
   });
 });
