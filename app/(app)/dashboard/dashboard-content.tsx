@@ -25,7 +25,7 @@ import { TrendingUp } from 'lucide-react';
 
 export async function DashboardContent() {
   await connection();
-  const { currentMonthStart, prevMonthStart, todayDayOfMonth } = getJakartaMonthStarts();
+  const { currentMonthStart, prevMonthStart, todayDayOfMonth } = getJakartaMonthStarts(new Date());
 
   return (
     <div className="space-y-6">

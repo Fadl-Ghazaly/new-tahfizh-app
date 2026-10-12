@@ -18,15 +18,13 @@ export function normalizeTheme(value: unknown): string {
 /**
  * Mendapatkan pengaturan publik sekolah dari Supabase via RPC.
  * Menggunakan "use cache" untuk performa dan instant navigation.
- * CacheLife: 'days' -> revalidate 1 hari (86400s), expire 30 hari, stale 1 hari.
- * Ini aman karena pengaturan sekolah sangat jarang berubah.
+ * stale 5 menit (klien), revalidate 1 jam (server), expire 30 hari.
+ * Perubahan dari halaman Pengaturan langsung terlihat lewat updateTag('school-settings').
  */
 async function fetchCachedSchoolSettings() {
   "use cache";
   cacheTag('school-settings');
- // stale 5 menit (klien), revalidate 1 jam (server), expire 30 hari.
-// Perubahan dari halaman Pengaturan langsung terlihat lewat updateTag('school-settings').
-cacheLife({ stale: 300, revalidate: 3600, expire: 2592000 });
+  cacheLife({ stale: 300, revalidate: 3600, expire: 2592000 });
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   

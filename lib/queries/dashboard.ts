@@ -1,3 +1,10 @@
+import {
+  computeTargetAchievement,
+  computeMemorizationStats,
+  comparePeriods,
+  sumDailyLinesUntil,
+  computeFluencyStats,
+} from '@/lib/dashboard-utils';
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 import { formatCapaian } from '@/lib/tahfizh';
@@ -304,30 +311,9 @@ export async function getFluencyStats(
     });
   }
 
-  const parseRow = (row: FluencyDistributionRow | undefined, ms: string) => {
-    if (!row) {
-      return {
-        month_start: ms,
-        excellent: 0,
-        good: 0,
-        needs_work: 0,
-        total: 0,
-        avg_score: null,
-      };
-    }
-    return {
-      month_start: ms,
-      excellent: Number(row.excellent_count ?? 0),
-      good: Number(row.good_count ?? 0),
-      needs_work: Number(row.needs_work_count ?? 0),
-      total: Number(row.total_records ?? 0),
-      avg_score: row.avg_fluency_score !== null ? Number(row.avg_fluency_score) : null,
-    };
-  };
-
   return {
-    prevMonth: parseRow(map.get(prevMonthStart), prevMonthStart),
-    currentMonth: parseRow(map.get(currentMonthStart), currentMonthStart),
+    prevMonth: computeFluencyStats(map.get(prevMonthStart), prevMonthStart),
+    currentMonth: computeFluencyStats(map.get(currentMonthStart), currentMonthStart),
   };
 }
 
@@ -415,19 +401,7 @@ export async function getJuzDistribution(): Promise<JuzDistributionData> {
  */
 export async function getTargetAchievement(): Promise<TargetAchievementData> {
   const summary = await getDashboardSummary();
-  const targetLines = summary.total_students * 9000;
-  const percentage = targetLines > 0
-    ? Math.min(100, Math.round((summary.total_sabaq_lines / targetLines) * 1000) / 10)
-    : 0;
-  const remainingLines = Math.max(0, targetLines - summary.total_sabaq_lines);
-
-  return {
-    total_lines: summary.total_sabaq_lines,
-    target_lines: targetLines,
-    percentage,
-    remaining_lines: remainingLines,
-    description: 'dari target 30 juz seluruh santri',
-  };
+  return computeTargetAchievement(summary.total_sabaq_lines, summary.total_students);
 }
 
 /**
@@ -446,37 +420,7 @@ export async function getMemorizationStats(): Promise<MemorizationStatsData> {
   }
 
   const totals = (data ?? []).map((d) => Number(d.total_sabaq_lines ?? 0));
-  if (totals.length === 0) {
-    return {
-      average_lines: 0,
-      median_lines: 0,
-      maximum_lines: 0,
-      formatted_average: formatCapaian(0),
-      formatted_median: formatCapaian(0),
-      formatted_maximum: formatCapaian(0),
-      students_above_10_juz: 0,
-    };
-  }
-
-  const sum = totals.reduce((a, b) => a + b, 0);
-  const avg = Math.round(sum / totals.length);
-  const max = totals[totals.length - 1];
-  const mid = Math.floor(totals.length / 2);
-  const median = totals.length % 2 === 0
-    ? Math.round((totals[mid - 1] + totals[mid]) / 2)
-    : totals[mid];
-
-  const studentsAbove10Juz = totals.filter((t) => t >= 3000).length;
-
-  return {
-    average_lines: avg,
-    median_lines: median,
-    maximum_lines: max,
-    formatted_average: formatCapaian(avg),
-    formatted_median: formatCapaian(median),
-    formatted_maximum: formatCapaian(max),
-    students_above_10_juz: studentsAbove10Juz,
-  };
+  return computeMemorizationStats(totals);
 }
 
 /**
@@ -490,20 +434,15 @@ export async function getProgressSummary(
 ): Promise<ProgressSummaryData> {
   const stats = await getDailyMemorizationStats(currentMonthStart, prevMonthStart, todayDayOfMonth);
 
-  const currentLinesToDate = stats.currentMonthStats.reduce((sum, d) => sum + d.sabaq, 0);
-  const prevLinesToDate = stats.prevMonthStats
-    .filter((d) => d.day <= todayDayOfMonth)
-    .reduce((sum, d) => sum + d.sabaq, 0);
+  const currentLinesToDate = sumDailyLinesUntil(stats.currentMonthStats, todayDayOfMonth);
+  const prevLinesToDate = sumDailyLinesUntil(stats.prevMonthStats, todayDayOfMonth);
 
-  const difference = currentLinesToDate - prevLinesToDate;
-  const percentageChange = prevLinesToDate > 0
-    ? Math.round(((currentLinesToDate - prevLinesToDate) / prevLinesToDate) * 1000) / 10
-    : null;
+  const comparison = comparePeriods(currentLinesToDate, prevLinesToDate);
 
   return {
     current_month_lines_to_date: currentLinesToDate,
     prev_month_lines_to_date: prevLinesToDate,
-    difference_lines: difference,
-    percentage_change: percentageChange,
+    difference_lines: comparison.delta,
+    percentage_change: comparison.percentChange,
   };
 }

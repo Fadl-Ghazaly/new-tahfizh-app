@@ -29,7 +29,7 @@ export async function TopTenTablesSection({ currentMonthStart }: { currentMonthS
                 <th className="py-2.5 px-3">Nama Santri</th>
                 <th className="py-2.5 px-3">Halaqah</th>
                 <th className="py-2.5 px-3 text-right">Capaian</th>
-                <th className="py-2.5 px-3 text-center">Kelancaran</th>
+                <th className="py-2.5 px-3 text-center">Nilai</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-sm">
