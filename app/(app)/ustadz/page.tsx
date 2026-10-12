@@ -1,25 +1,18 @@
-import type { Metadata } from 'next';
-import { PageHeader } from '@/components/layout/page-header';
-import { EmptyState } from '@/components/layout/empty-state';
-import { GraduationCap } from 'lucide-react';
+import { createClient } from '@/lib/supabase/server';
+import { UstadzClientContent } from './ustadz-client-content';
+import { Suspense } from 'react';
 
-export const metadata: Metadata = {
-  title: 'Data Ustadz — Tahfizh App',
-  description: 'Kelola data ustadz dan musyrif Pesantren Darul Ilmi.',
-};
-
-export default function UstadzPage() {
+export default async function UstadzPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  let isAdmin = false;
+  if (user) {
+    const { data } = await supabase.from('profiles').select('role, is_active').eq('id', user.id).single();
+    isAdmin = data?.role === 'ADMIN' && data?.is_active === true;
+  }
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Data Ustadz"
-        description="Kelola data ustadz dan musyrif halaqah."
-      />
-      <EmptyState
-        icon={<GraduationCap className="h-8 w-8 text-primary" />}
-        title="Fitur ini sedang dikembangkan"
-        description="Tabel data ustadz dan fitur manajemen halaqah akan tersedia pada fase berikutnya."
-      />
+      <Suspense><UstadzClientContent isAdmin={isAdmin} /></Suspense>
     </div>
   );
 }
