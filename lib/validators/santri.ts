@@ -4,9 +4,9 @@ import { normalizeWhatsApp } from './common'
 export const studentSchema = z.object({
   nisn: z.string().trim().regex(/^\d{10}$/, 'NISN harus tepat 10 digit angka.'),
   name: z.string().trim().min(2, 'Nama santri minimal 2 karakter.'),
-  gender: z.enum(['L', 'P'], { message: 'Jenis kelamin harus L atau P.' }),
-  class_id: z.string().uuid('Kelas tidak valid.'),
-  halaqah_id: z.string().uuid('Halaqah tidak valid.'),
+  gender: z.enum(['L', 'P'], { message: 'Pilih jenis kelamin.' }),
+  class_id: z.string().trim().min(1, 'Pilih kelas.').uuid('Kelas tidak valid.'),
+  halaqah_id: z.string().trim().min(1, 'Pilih halaqah.').uuid('Halaqah tidak valid.'),
   parent_name: z.string().trim().min(2, 'Nama orangtua minimal 2 karakter.'),
   parent_whatsapp: z
     .string()

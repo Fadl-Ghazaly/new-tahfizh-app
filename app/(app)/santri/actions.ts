@@ -1,7 +1,9 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth/require-admin'
-import { studentSchema, StudentInput } from '@/lib/validators/santri'
+import { studentSchema } from '@/lib/validators/santri'
+import { validateStudentHalaqahRule } from '@/lib/validators/santri-rules'
+import { mapDbError } from '@/lib/validators/list-params'
 import { revalidatePath } from 'next/cache'
 
 export async function createStudent(rawInput: unknown) {
@@ -17,23 +19,20 @@ export async function createStudent(rawInput: unknown) {
 
   const data = parsed.data
 
-  // Verify halaqah exists, is active, and its class_id matches data.class_id
+  // Verify halaqah rule
   const { data: halaqah, error: halaqahError } = await supabase
     .from('halaqahs')
     .select('id, class_id, is_active')
     .eq('id', data.halaqah_id)
     .single()
 
-  if (halaqahError || !halaqah) {
-    return { ok: false, error: 'Halaqah yang dipilih tidak ditemukan.' }
+  if (halaqahError) {
+    console.error('Error fetching halaqah:', halaqahError.code, halaqahError.message)
   }
 
-  if (!halaqah.is_active) {
-    return { ok: false, error: 'Tidak dapat memasukkan santri ke halaqah yang nonaktif.' }
-  }
-
-  if (halaqah.class_id !== data.class_id) {
-    return { ok: false, error: 'Kelas santri harus sama dengan class_id halaqah.' }
+  const ruleCheck = validateStudentHalaqahRule(data.class_id, halaqah)
+  if (!ruleCheck.valid) {
+    return { ok: false, error: ruleCheck.error }
   }
 
   const { error: insertError } = await supabase.from('students').insert({
@@ -48,10 +47,8 @@ export async function createStudent(rawInput: unknown) {
   })
 
   if (insertError) {
-    if (insertError.code === '23505') {
-      return { ok: false, error: 'NISN sudah terdaftar.' }
-    }
-    return { ok: false, error: 'Gagal menambahkan santri: ' + insertError.message }
+    console.error('Error inserting student:', insertError.code, insertError.message)
+    return { ok: false, error: mapDbError(insertError) }
   }
 
   revalidatePath('/santri')
@@ -71,23 +68,20 @@ export async function updateStudent(id: string, rawInput: unknown) {
 
   const data = parsed.data
 
-  // Verify halaqah
+  // Verify halaqah rule
   const { data: halaqah, error: halaqahError } = await supabase
     .from('halaqahs')
     .select('id, class_id, is_active')
     .eq('id', data.halaqah_id)
     .single()
 
-  if (halaqahError || !halaqah) {
-    return { ok: false, error: 'Halaqah yang dipilih tidak ditemukan.' }
+  if (halaqahError) {
+    console.error('Error fetching halaqah:', halaqahError.code, halaqahError.message)
   }
 
-  if (!halaqah.is_active) {
-    return { ok: false, error: 'Tidak dapat memindahkan santri ke halaqah yang nonaktif.' }
-  }
-
-  if (halaqah.class_id !== data.class_id) {
-    return { ok: false, error: 'Kelas santri harus sama dengan class_id halaqah.' }
+  const ruleCheck = validateStudentHalaqahRule(data.class_id, halaqah)
+  if (!ruleCheck.valid) {
+    return { ok: false, error: ruleCheck.error }
   }
 
   const { error: updateError } = await supabase
@@ -105,10 +99,8 @@ export async function updateStudent(id: string, rawInput: unknown) {
     .eq('id', id)
 
   if (updateError) {
-    if (updateError.code === '23505') {
-      return { ok: false, error: 'NISN sudah terdaftar.' }
-    }
-    return { ok: false, error: 'Gagal memperbarui santri: ' + updateError.message }
+    console.error('Error updating student:', updateError.code, updateError.message)
+    return { ok: false, error: mapDbError(updateError) }
   }
 
   revalidatePath('/santri')
@@ -123,18 +115,26 @@ export async function setStudentStatus(id: string, status: 'ACTIVE' | 'INACTIVE'
 
   if (status === 'ACTIVE') {
     // Check if student's halaqah is active
-    const { data: student } = await supabase
+    const { data: student, error: studentError } = await supabase
       .from('students')
       .select('halaqah_id')
       .eq('id', id)
       .single()
 
+    if (studentError) {
+      console.error('Error fetching student for activation:', studentError.code, studentError.message)
+    }
+
     if (student) {
-      const { data: halaqah } = await supabase
+      const { data: halaqah, error: halError } = await supabase
         .from('halaqahs')
         .select('is_active')
         .eq('id', student.halaqah_id)
         .single()
+
+      if (halError) {
+        console.error('Error fetching student halaqah for activation:', halError.code, halError.message)
+      }
 
       if (halaqah && !halaqah.is_active) {
         return { ok: false, error: 'Tidak dapat mengaktifkan santri karena halaqahnya sedang nonaktif. Pindahkan halaqah terlebih dahulu.' }
@@ -148,7 +148,8 @@ export async function setStudentStatus(id: string, status: 'ACTIVE' | 'INACTIVE'
     .eq('id', id)
 
   if (error) {
-    return { ok: false, error: 'Gagal mengubah status santri: ' + error.message }
+    console.error('Error setting student status:', error.code, error.message)
+    return { ok: false, error: mapDbError(error) }
   }
 
   revalidatePath('/santri')
