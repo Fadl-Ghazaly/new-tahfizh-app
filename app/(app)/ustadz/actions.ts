@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth/require-admin'
+import { validateTeacherDeactivationRule } from '@/lib/validators/ustadz-rules'
 import { teacherSchema } from '@/lib/validators/ustadz'
 import { revalidatePath } from 'next/cache'
 
@@ -22,7 +23,7 @@ export async function createTeacher(rawInput: unknown) {
     gender: data.gender,
     whatsapp: data.whatsapp,
     boarding_school: data.boarding_school,
-    is_active: data.is_active,
+    
   })
 
   if (insertError) {
@@ -53,7 +54,7 @@ export async function updateTeacher(id: string, rawInput: unknown) {
       gender: data.gender,
       whatsapp: data.whatsapp,
       boarding_school: data.boarding_school,
-      is_active: data.is_active,
+      
     })
     .eq('id', id)
 
@@ -84,8 +85,10 @@ export async function setTeacherStatus(id: string, is_active: boolean) {
     }
 
     if (halaqahs && halaqahs.length > 0) {
-      const names = halaqahs.map((h) => h.name).join(', ')
-      return { ok: false, error: `Ganti ustadz pengampu halaqah ${names} terlebih dahulu.` }
+      const rule = validateTeacherDeactivationRule(halaqahs)
+      if (!rule.valid && rule.error) {
+        return { ok: false, error: rule.error }
+      }
     }
   }
 

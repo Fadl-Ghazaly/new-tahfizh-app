@@ -1,18 +1,35 @@
-import { createClient } from '@/lib/supabase/server';
-import { UstadzClientContent } from './ustadz-client-content';
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { PageHeader } from '@/components/layout/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
+import { UstadzContent } from './ustadz-content';
 
-export default async function UstadzPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  let isAdmin = false;
-  if (user) {
-    const { data } = await supabase.from('profiles').select('role, is_active').eq('id', user.id).single();
-    isAdmin = data?.role === 'ADMIN' && data?.is_active === true;
-  }
+export const metadata: Metadata = {
+  title: 'Data Ustadz — Tahfizh App',
+  description: 'Kelola data ustadz dan musyrif Pesantren Darul Ilmi.',
+};
+
+export default function UstadzPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   return (
     <div className="flex flex-col gap-6">
-      <Suspense><UstadzClientContent isAdmin={isAdmin} /></Suspense>
+      <PageHeader
+        title="Data Ustadz"
+        description="Kelola data ustadz dan musyrif halaqah."
+      />
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-16 w-full rounded-lg" />
+            <Skeleton className="h-96 w-full rounded-lg" />
+          </div>
+        }
+      >
+        <UstadzContent searchParams={searchParams} />
+      </Suspense>
     </div>
   );
 }

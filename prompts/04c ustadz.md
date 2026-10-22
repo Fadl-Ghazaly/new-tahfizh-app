@@ -66,3 +66,6 @@ LARANGAN
 KELUARAN
 Rencana (sebelum mengedit); lalu daftar file dibuat/dihapus/diubah, keluaran MENTAH npm test (baris "Test Files ... Tests ..."), lint,
 typecheck, build, konfirmasi app/api tidak lagi memuat ustadz-list dan rute build tidak memuat /api/*, lalu BERHENTI dan beri daftar uji manual.
+
+Pakai ulang zodIssuesToFieldErrors dari lib/validators/common.ts, withUstadzTitle dari lib/formatters.ts, dan helper optionLabel;
+jangan membuat salinan. Pesan galat server (mis. ustadz masih mengampu halaqah aktif) ditampilkan jelas di dialog konfirmasi atau toast, bukan error mentah.

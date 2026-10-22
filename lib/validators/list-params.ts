@@ -43,10 +43,10 @@ export function parseListParams(rawParams: Record<string, string | string[] | un
   };
 }
 
-export function mapDbError(error: { code?: string; message?: string } | null): string {
+export function mapDbError(error: { code?: string; message?: string } | null, context: 'santri' | 'ustadz' = 'santri'): string {
   if (!error) return 'Terjadi kesalahan. Coba lagi.';
   if (error.code === '23505') {
-    return 'NISN sudah terdaftar.';
+    return context === 'santri' ? 'NISN sudah terdaftar.' : 'Data duplikat terdeteksi.';
   }
   if (error.code === '23503') {
     return 'Data masih dipakai.';
