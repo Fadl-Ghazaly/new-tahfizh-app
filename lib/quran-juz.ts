@@ -424,3 +424,57 @@ export function getNextSabaqChunk(
     isJuzCompleted,
   };
 }
+
+
+/**
+ * Menghitung jumlah baris untuk rentang ayat dalam suatu juz menggunakan
+ * model alokasi kumulatif yang sama persis dengan getNextSabaqChunk.
+ * Hasil minimal 1.
+ */
+/**
+ * Menghitung jumlah baris untuk rentang ayat dalam suatu juz menggunakan
+ * model alokasi kumulatif yang sama persis dengan getNextSabaqChunk.
+ * Hasil minimal 1.
+ */
+export function computeLinesForRange(juz: number, surahId: number, ayahStart: number, ayahEnd: number): number {
+  if (juz < 1 || juz > 30) {
+    throw new Error(`Juz di luar rentang 1-30: ${juz}`);
+  }
+  const segments = QURAN_JUZ_SEGMENTS[juz];
+  if (!segments) {
+    throw new Error(`Segmen juz tidak ditemukan: ${juz}`);
+  }
+
+  const segment = segments.find((s) => s.surahId === surahId);
+  if (!segment) {
+    throw new Error(`Surat ${surahId} tidak terdapat pada Juz ${juz}`);
+  }
+
+  if (ayahStart < segment.ayahStart || ayahEnd > segment.ayahEnd || ayahStart > ayahEnd) {
+    throw new Error(`Rentang ayat ${ayahStart}-${ayahEnd} di luar batas Juz ${juz} Surat ${surahId} (${segment.ayahStart}-${segment.ayahEnd})`);
+  }
+
+  const startGlobal = getAyahGlobalIndexInJuz(juz, surahId, ayahStart);
+  const endGlobal = getAyahGlobalIndexInJuz(juz, surahId, ayahEnd);
+
+  const startCum = getCumulativeLinesInJuz(juz, startGlobal - 1);
+  const endCum = getCumulativeLinesInJuz(juz, endGlobal);
+
+  const lineCount = endCum - startCum;
+  return Math.max(1, lineCount);
+}
+
+/**
+ * Mendapatkan daftar surat dan rentang ayat yang termasuk dalam Juz tertentu.
+ */
+export function getSurahOptionsForJuz(juz: number): Array<{ surahId: number; ayahStart: number; ayahEnd: number; ayahCount: number }> {
+  if (juz < 1 || juz > 30) return [];
+  const segments = QURAN_JUZ_SEGMENTS[juz];
+  if (!segments) return [];
+  return segments.map((s) => ({
+    surahId: s.surahId,
+    ayahStart: s.ayahStart,
+    ayahEnd: s.ayahEnd,
+    ayahCount: s.ayahCount,
+  }));
+}

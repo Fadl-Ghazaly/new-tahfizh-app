@@ -54,3 +54,7 @@ Fungsi sesuai PRD, tanpa error konsol, lint & build lulus, tampil baik di HP dan
 - Next.js 16 (Cache Components): komponen halaman sinkron dan statis. Semua pembacaan data per-request
   (cookies, headers, searchParams, connection(), query Supabase) berada di komponen anak async yang dibungkus
   <Suspense> dengan skeleton. Dilarang memakai `export const instant = false` untuk membungkam error.
+
+  - shadcn di proyek ini berbasis Base UI: JANGAN memakai `asChild` (itu Radix). Gunakan prop `render` untuk mengganti elemen dasar.
+  Jangan menaruh elemen blok (div, ul) di dalam komponen Description/Title (itu <p>/<h2>); taruh di luarnya.
+- Laporan verifikasi harus berupa keluaran mentah npm test/lint/typecheck/build yang dijalankan SETELAH perubahan terakhir.
