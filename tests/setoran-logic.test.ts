@@ -152,4 +152,29 @@ describe('Setoran Logic Tests (Fase 4 Tahap A)', () => {
       expect(mapDbError({ code: '23505' }, 'ustadz')).toBe('Data duplikat terdeteksi.');
     });
   });
+
+  describe('8. Additional Juz & Line Resolution Tests', () => {
+    it('getSurahOptionsForJuz mengembalikan surat dan rentang yang benar, juz di luar 1-30 kosong/ditolak', () => {
+      const juz1Opts = getSurahOptionsForJuz(1);
+      expect(juz1Opts.length).toBeGreaterThan(0);
+      expect(juz1Opts[0].surahId).toBe(1);
+      expect(getSurahOptionsForJuz(0)).toEqual([]);
+      expect(getSurahOptionsForJuz(31)).toEqual([]);
+    });
+
+    it('resolveLineCount pada batas 0, 1, 300, 301 dan ADMIN tanpa catatan', () => {
+      // ADMIN with notes override
+      expect(resolveLineCount({ role: 'ADMIN', computed: 10, requested: 1, notes: 'Valid note here' })).toBe(1);
+      expect(resolveLineCount({ role: 'ADMIN', computed: 10, requested: 300, notes: 'Valid note here' })).toBe(300);
+
+      // Out of bounds requested lines should throw TH002
+      expect(() => resolveLineCount({ role: 'ADMIN', computed: 10, requested: 0, notes: 'Valid note here' })).toThrow('TH002');
+      expect(() => resolveLineCount({ role: 'ADMIN', computed: 10, requested: 301, notes: 'Valid note here' })).toThrow('TH002');
+
+      // ADMIN without notes or short notes should throw TH002
+      expect(() => resolveLineCount({ role: 'ADMIN', computed: 10, requested: 15 })).toThrow('TH002');
+      expect(() => resolveLineCount({ role: 'ADMIN', computed: 10, requested: 15, notes: 'abc' })).toThrow('TH002');
+    });
+  });
+
 });

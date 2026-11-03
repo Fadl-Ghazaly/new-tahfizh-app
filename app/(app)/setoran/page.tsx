@@ -1,25 +1,35 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
-import { EmptyState } from '@/components/layout/empty-state';
-import { BookOpenCheck } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SetoranContent } from './setoran-content';
 
 export const metadata: Metadata = {
   title: 'Input Setoran — Tahfizh App',
-  description: 'Input setoran hafalan santri.',
+  description: 'Input setoran hafalan harian santri (Sabaq, Sabqi, Manzil).',
 };
 
-export default function SetoranPage() {
+export default function SetoranPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Input Setoran"
-        description="Input setoran hafalan harian santri (Sabaq, Sabqi, Manzil)."
+        description="Pencatatan presensi dan setoran hafalan santri (Sabaq, Sabqi, Manzil)."
       />
-      <EmptyState
-        icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
-        title="Fitur ini sedang dikembangkan"
-        description="Form input setoran dan rekap kehadiran akan tersedia pada fase berikutnya."
-      />
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-16 w-full rounded-lg" />
+            <Skeleton className="h-96 w-full rounded-lg" />
+          </div>
+        }
+      >
+        <SetoranContent searchParams={searchParams} />
+      </Suspense>
     </div>
   );
 }
