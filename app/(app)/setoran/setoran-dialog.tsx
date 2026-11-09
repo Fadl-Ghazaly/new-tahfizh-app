@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { computeLinesForRange, getSurahOptionsForJuz } from '@/lib/quran-juz';
 import { hitungNilai } from '@/lib/tahfizh';
+import { optionLabel, SelectOption } from '@/lib/formatters';
 import { canChangeAttendance } from '@/lib/setoran/rules';
+import {
+  DialogFormState,
+  getInitialDialogState,
+  handleJuzChangeState,
+  isAyahRangeValid,
+  formatSetoranDateIndonesian,
+} from '@/lib/setoran/dialog-state';
+import { SetoranSurahOption } from './setoran-client';
 import { submitSetoran } from './actions';
 import { toast } from 'sonner';
 
@@ -27,6 +37,7 @@ export interface SetoranDialogProps {
   selectedDate: string;
   type: 'SABAQ' | 'SABQI' | 'MANZIL';
   role: 'ADMIN' | 'USTADZ';
+  surahs: SetoranSurahOption[];
 }
 
 export function SetoranDialog({
@@ -36,54 +47,92 @@ export function SetoranDialog({
   selectedDate,
   type,
   role,
+  surahs,
 }: SetoranDialogProps) {
-  const [attendance, setAttendance] = useState<string>(student?.attendanceStatus || '');
-  const [juz, setJuz] = useState<number>(1);
-  const [surahId, setSurahId] = useState<number>(1);
-  const [ayahStart, setAyahStart] = useState<number>(1);
-  const [ayahEnd, setAyahEnd] = useState<number>(7);
-  const [manualOverride, setManualOverride] = useState<boolean>(false);
-  const [lineCount, setLineCount] = useState<number>(5);
-  const [mistakeCount, setMistakeCount] = useState<number>(0);
-  const [notes, setNotes] = useState<string>('');
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
+  const [formState, setFormState] = useState<DialogFormState>(() =>
+    getInitialDialogState(student?.attendanceStatus)
+  );
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isPending, setIsPending] = useState<boolean>(false);
 
   if (!student) return null;
 
-  const isPresent = attendance === 'HADIR' || attendance === 'TERLAMBAT';
-  const attendanceBlocked = !canChangeAttendance(attendance, student.activeRecordsCount);
+  const isPresent = formState.attendance === 'HADIR' || formState.attendance === 'TERLAMBAT';
+  const attendanceBlocked = !canChangeAttendance(formState.attendance, student.activeRecordsCount);
 
-  const surahOptions = getSurahOptionsForJuz(juz);
+  const attendanceOptions: SelectOption[] = [
+    { value: 'HADIR', label: 'Hadir' },
+    { value: 'TERLAMBAT', label: 'Terlambat' },
+    { value: 'IZIN', label: 'Izin' },
+    { value: 'SAKIT', label: 'Sakit' },
+    { value: 'ALPHA', label: 'Alpha' },
+  ];
+
+  const juzOptions: SelectOption[] = Array.from({ length: 30 }, (_, i) => ({
+    value: String(i + 1),
+    label: `Juz ${i + 1}`,
+  }));
+
+  const jNum = formState.juz ? parseInt(formState.juz, 10) : null;
+  const surahOptions = jNum ? getSurahOptionsForJuz(jNum) : [];
+
+  const surahSelectOptions: SelectOption[] = surahOptions.map((opt) => {
+    const meta = surahs.find((s) => s.id === opt.surahId);
+    const label = meta ? `${meta.number}. ${meta.nameLatin}` : `Surat ${opt.surahId}`;
+    return {
+      value: String(opt.surahId),
+      label,
+    };
+  });
+
+  const sNum = formState.surahId ? parseInt(formState.surahId, 10) : null;
+  const aStartNum = formState.ayahStart ? parseInt(formState.ayahStart, 10) : null;
+  const aEndNum = formState.ayahEnd ? parseInt(formState.ayahEnd, 10) : null;
+
+  const rangeValid = isAyahRangeValid(jNum, sNum, aStartNum, aEndNum);
+  const computedLines = rangeValid && jNum && sNum && aStartNum && aEndNum
+    ? computeLinesForRange(jNum, sNum, aStartNum, aEndNum)
+    : null;
 
   const handleJuzChange = (newJuz: string | null) => {
     if (!newJuz) return;
-    const j = parseInt(newJuz, 10);
-    setJuz(j);
-    const opts = getSurahOptionsForJuz(j);
-    if (opts.length > 0) {
-      setSurahId(opts[0].surahId);
-      setAyahStart(opts[0].ayahStart);
-      setAyahEnd(Math.min(opts[0].ayahStart + 5, opts[0].ayahEnd));
-    }
+    setFormState((prev) => handleJuzChangeState(prev, newJuz));
+    setFieldErrors({});
   };
 
   const handleSurahChange = (newSurah: string | null) => {
     if (!newSurah) return;
     const sId = parseInt(newSurah, 10);
-    setSurahId(sId);
     const opt = surahOptions.find((o) => o.surahId === sId);
-    if (opt) {
-      setAyahStart(opt.ayahStart);
-      setAyahEnd(opt.ayahStart);
-    }
+    setFormState((prev) => ({
+      ...prev,
+      surahId: newSurah,
+      ayahStart: opt ? String(opt.ayahStart) : '',
+      ayahEnd: opt ? String(opt.ayahStart) : '',
+      lineCount: '',
+    }));
+    setFieldErrors({});
   };
 
   const handleAttendanceChange = (val: string | null) => {
     if (val) {
-      setAttendance(val);
+      setFormState((prev) => ({ ...prev, attendance: val }));
       setFieldErrors({});
+    }
+  };
+
+  const getTypeBadgeClass = (t: 'SABAQ' | 'SABQI' | 'MANZIL') => {
+    switch (t) {
+      case 'SABAQ':
+        return 'border-emerald-500 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30';
+      case 'SABQI':
+        return 'border-blue-500 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/30';
+      case 'MANZIL':
+        return 'border-amber-500 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30';
     }
   };
 
@@ -98,19 +147,20 @@ export function SetoranDialog({
     setIsPending(true);
 
     try {
-      const computed = isPresent ? computeLinesForRange(juz, surahId, ayahStart, ayahEnd) : null;
-      const finalLines = manualOverride ? lineCount : computed;
+      const finalLines = formState.manualOverride
+        ? (parseInt(formState.lineCount, 10) || null)
+        : computedLines;
 
       const payload = {
-        attendance,
+        attendance: formState.attendance,
         type: isPresent ? type : null,
-        juz: isPresent ? juz : null,
-        surah_id: isPresent ? surahId : null,
-        ayah_start: isPresent ? ayahStart : null,
-        ayah_end: isPresent ? ayahEnd : null,
+        juz: isPresent && jNum ? jNum : null,
+        surah_id: isPresent && sNum ? sNum : null,
+        ayah_start: isPresent && aStartNum ? aStartNum : null,
+        ayah_end: isPresent && aEndNum ? aEndNum : null,
         line_count: finalLines,
-        mistake_count: mistakeCount,
-        notes: notes || null,
+        mistake_count: formState.mistakeCount,
+        notes: formState.notes || null,
       };
 
       const res = await submitSetoran({
@@ -129,6 +179,9 @@ export function SetoranDialog({
       } else {
         toast.success('Setoran berhasil disimpan');
         onOpenChange(false);
+        startTransition(() => {
+          router.refresh();
+        });
       }
     } catch {
       toast.error('Gagal memproses setoran.');
@@ -141,26 +194,30 @@ export function SetoranDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Input Setoran Santri</DialogTitle>
-            <Badge variant="outline">{type}</Badge>
+          <DialogTitle>Input Setoran Santri</DialogTitle>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
+            <span>{student.name} &mdash; {formatSetoranDateIndonesian(selectedDate)}</span>
+            <Badge variant="outline" className={getTypeBadgeClass(type)}>
+              {type}
+            </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">{student.name} &mdash; {selectedDate}</p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label className="text-sm font-medium">Status Kehadiran</label>
-            <Select value={attendance} onValueChange={handleAttendanceChange}>
+            <Select value={formState.attendance} onValueChange={handleAttendanceChange}>
               <SelectTrigger aria-invalid={!!fieldErrors.attendance}>
-                <SelectValue placeholder="Pilih Kehadiran" />
+                <SelectValue placeholder="Pilih Kehadiran">
+                  {(val: string | null) => optionLabel(attendanceOptions, val, 'Pilih Kehadiran')}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="HADIR">Hadir</SelectItem>
-                <SelectItem value="TERLAMBAT">Terlambat</SelectItem>
-                <SelectItem value="IZIN">Izin</SelectItem>
-                <SelectItem value="SAKIT">Sakit</SelectItem>
-                <SelectItem value="ALPHA">Alpha</SelectItem>
+                {attendanceOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {fieldErrors.attendance && <p className="text-xs text-destructive mt-1">{fieldErrors.attendance}</p>}
@@ -171,9 +228,9 @@ export function SetoranDialog({
             )}
           </div>
 
-          {!isPresent && attendance && (
+          {!isPresent && formState.attendance && (
             <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
-              Hanya kehadiran yang dicatat untuk status {attendance}.
+              Hanya kehadiran yang dicatat untuk status {formState.attendance}.
             </div>
           )}
 
@@ -182,26 +239,38 @@ export function SetoranDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium">Juz</label>
-                  <Select value={String(juz)} onValueChange={handleJuzChange}>
+                  <Select value={formState.juz} onValueChange={handleJuzChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Juz" />
+                      <SelectValue placeholder="Pilih juz">
+                        {(val: string | null) => optionLabel(juzOptions, val, 'Pilih juz')}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => (
-                        <SelectItem key={j} value={String(j)}>Juz {j}</SelectItem>
+                      {juzOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Surat</label>
-                  <Select value={String(surahId)} onValueChange={handleSurahChange}>
+                  <Select
+                    value={formState.surahId}
+                    onValueChange={handleSurahChange}
+                    disabled={!formState.juz}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Surat" />
+                      <SelectValue placeholder="Pilih surat">
+                        {(val: string | null) => optionLabel(surahSelectOptions, val, 'Pilih surat')}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {surahOptions.map((opt) => (
-                        <SelectItem key={opt.surahId} value={String(opt.surahId)}>Surat {opt.surahId}</SelectItem>
+                      {surahSelectOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -214,8 +283,11 @@ export function SetoranDialog({
                   <Input
                     type="number"
                     inputMode="numeric"
-                    value={ayahStart}
-                    onChange={(e) => setAyahStart(parseInt(e.target.value, 10) || 1)}
+                    placeholder="Ayat mulai"
+                    value={formState.ayahStart}
+                    onChange={(e) =>
+                      setFormState((prev) => ({ ...prev, ayahStart: e.target.value }))
+                    }
                   />
                   {fieldErrors.ayah_start && <p className="text-xs text-destructive mt-1">{fieldErrors.ayah_start}</p>}
                 </div>
@@ -224,8 +296,11 @@ export function SetoranDialog({
                   <Input
                     type="number"
                     inputMode="numeric"
-                    value={ayahEnd}
-                    onChange={(e) => setAyahEnd(parseInt(e.target.value, 10) || 1)}
+                    placeholder="Ayat selesai"
+                    value={formState.ayahEnd}
+                    onChange={(e) =>
+                      setFormState((prev) => ({ ...prev, ayahEnd: e.target.value }))
+                    }
                   />
                   {fieldErrors.ayah_end && <p className="text-xs text-destructive mt-1">{fieldErrors.ayah_end}</p>}
                 </div>
@@ -233,15 +308,26 @@ export function SetoranDialog({
 
               <div>
                 <label className="text-sm font-medium">Jumlah Baris</label>
-                {!manualOverride ? (
-                  <div className="text-sm font-semibold p-2 bg-muted rounded border">
-                    {computeLinesForRange(juz, surahId, ayahStart, ayahEnd)} baris (otomatis)
+                {!formState.manualOverride ? (
+                  <div className="text-sm p-2 bg-muted rounded border">
+                    {rangeValid && computedLines !== null ? (
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                        {computedLines} baris (otomatis)
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Pilih juz, surat, dan rentang ayat yang valid
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <Input
                     type="number"
-                    value={lineCount}
-                    onChange={(e) => setLineCount(parseInt(e.target.value, 10) || 1)}
+                    value={formState.lineCount}
+                    placeholder="Masukkan jumlah baris manual"
+                    onChange={(e) =>
+                      setFormState((prev) => ({ ...prev, lineCount: e.target.value }))
+                    }
                   />
                 )}
                 {role === 'ADMIN' && (
@@ -249,8 +335,14 @@ export function SetoranDialog({
                     <input
                       type="checkbox"
                       id="manualOverride"
-                      checked={manualOverride}
-                      onChange={(e) => setManualOverride(e.target.checked)}
+                      checked={formState.manualOverride}
+                      onChange={(e) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          manualOverride: e.target.checked,
+                          lineCount: prev.lineCount || (computedLines ? String(computedLines) : ''),
+                        }))
+                      }
                       className="rounded"
                     />
                     <label htmlFor="manualOverride" className="text-xs text-muted-foreground">
@@ -262,14 +354,31 @@ export function SetoranDialog({
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span>Kesalahan: <strong>{mistakeCount}</strong></span>
-                  <span>Nilai Kelancaran: <strong>{hitungNilai(mistakeCount)}</strong></span>
+                  <span>Kesalahan: <strong>{formState.mistakeCount}</strong></span>
+                  <span>Nilai Kelancaran: <strong>{hitungNilai(formState.mistakeCount)}</strong></span>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setMistakeCount((m) => Math.min(50, m + 1))}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        mistakeCount: Math.min(50, prev.mistakeCount + 1),
+                      }))
+                    }
+                  >
                     +1 Kesalahan (-5 Nilai)
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setMistakeCount(0)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setFormState((prev) => ({ ...prev, mistakeCount: 0 }))
+                    }
+                  >
                     Atur Ulang
                   </Button>
                 </div>
@@ -278,8 +387,10 @@ export function SetoranDialog({
               <div>
                 <label className="text-sm font-medium">Catatan</label>
                 <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  value={formState.notes}
+                  onChange={(e) =>
+                    setFormState((prev) => ({ ...prev, notes: e.target.value }))
+                  }
                   placeholder="Catatan ustadz / admin..."
                   maxLength={500}
                 />
@@ -291,7 +402,15 @@ export function SetoranDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Batal
             </Button>
-            <Button type="submit" disabled={isPending || attendanceBlocked || !attendance}>
+            <Button
+              type="submit"
+              disabled={
+                isPending ||
+                attendanceBlocked ||
+                !formState.attendance ||
+                (isPresent && (!rangeValid || (!formState.manualOverride && !computedLines)))
+              }
+            >
               {isPending ? 'Menyimpan...' : 'Simpan Setoran'}
             </Button>
           </DialogFooter>

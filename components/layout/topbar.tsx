@@ -17,7 +17,7 @@ export function Topbar({ userName, role, schoolName }: TopbarProps) {
     .toUpperCase();
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card/90 px-4 shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-md md:left-72 md:px-6">
+    <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card/90 px-4 shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-md md:left-72 md:px-6 print:hidden">
       {/* Kiri — nama pesantren */}
       <div className="flex items-center gap-2 min-w-0">
         <Landmark className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />

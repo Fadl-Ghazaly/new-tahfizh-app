@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from '@
 import { Badge } from '@/components/ui/badge';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatCapaian } from '@/lib/tahfizh';
+import { optionLabel, withUstadzTitle } from '@/lib/formatters';
 import { SetoranDialog, SetoranDialogStudent } from './setoran-dialog';
 import { RiwayatDialog, MemorizationRecordRow } from './riwayat-dialog';
 
@@ -36,6 +37,12 @@ export interface SetoranClientTeacherOption {
   name: string;
 }
 
+export interface SetoranSurahOption {
+  id: number;
+  number: number;
+  nameLatin: string;
+}
+
 export interface SetoranClientProps {
   role: 'ADMIN' | 'USTADZ';
   params: {
@@ -49,6 +56,7 @@ export interface SetoranClientProps {
   dateLimits: { min: string; max: string };
   classes: SetoranClientClassOption[];
   teachers: SetoranClientTeacherOption[];
+  surahs: SetoranSurahOption[];
   items: StudentSetoranItem[];
   totalCount: number;
 }
@@ -59,6 +67,7 @@ export function SetoranClient({
   dateLimits,
   classes,
   teachers,
+  surahs,
   items,
   totalCount,
 }: SetoranClientProps) {
@@ -75,6 +84,33 @@ export function SetoranClient({
 
   const [riwayatStudent, setRiwayatStudent] = useState<{ id: string; name: string; records: MemorizationRecordRow[] } | null>(null);
   const [riwayatOpen, setRiwayatOpen] = useState<boolean>(false);
+
+  const classFilterOptions = [
+    { value: 'all', label: 'Semua Kelas' },
+    ...classes.map((c) => ({ value: String(c.level), label: `Kelas ${c.level}` })),
+  ];
+
+  const ustadzFilterOptions = [
+    { value: 'all', label: 'Semua Ustadz' },
+    ...teachers.map((t) => ({ value: t.id, label: withUstadzTitle(t.name) })),
+  ];
+
+  const getTabStyle = (tabType: 'SABAQ' | 'SABQI' | 'MANZIL', isActive: boolean) => {
+    switch (tabType) {
+      case 'SABAQ':
+        return isActive
+          ? 'bg-emerald-600 text-white shadow-sm dark:bg-emerald-700'
+          : 'border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40';
+      case 'SABQI':
+        return isActive
+          ? 'bg-blue-600 text-white shadow-sm dark:bg-blue-700'
+          : 'border border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40';
+      case 'MANZIL':
+        return isActive
+          ? 'bg-amber-600 text-white shadow-sm dark:bg-amber-700'
+          : 'border border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40';
+    }
+  };
 
   const updateQuery = (newParams: Record<string, string | number>) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -136,7 +172,9 @@ export function SetoranClient({
               onValueChange={(val) => updateQuery({ class: val || 'all', page: 1 })}
             >
               <SelectTrigger className="w-36">
-                <SelectValue placeholder="Semua Kelas" />
+                <SelectValue placeholder="Semua Kelas">
+                  {(val: string | null) => optionLabel(classFilterOptions, val, 'Semua Kelas')}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Kelas</SelectItem>
@@ -155,12 +193,14 @@ export function SetoranClient({
                 onValueChange={(val) => updateQuery({ ustadz: val || 'all', page: 1 })}
               >
                 <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Semua Ustadz" />
+                  <SelectValue placeholder="Semua Ustadz">
+                    {(val: string | null) => optionLabel(ustadzFilterOptions, val, 'Semua Ustadz')}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Ustadz</SelectItem>
                   {teachers.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    <SelectItem key={t.id} value={t.id}>{withUstadzTitle(t.name)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -191,11 +231,7 @@ export function SetoranClient({
             <Link
               key={t}
               href={`${pathname}?${sp.toString()}`}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                active
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${getTabStyle(t, active)}`}
             >
               {t}
             </Link>
@@ -233,7 +269,18 @@ export function SetoranClient({
                       <div className="font-semibold">{item.name}</div>
                     </TableCell>
                     <TableCell>{item.className}</TableCell>
-                    <TableCell>{item.halaqahName} <span className="text-xs text-muted-foreground">({item.rawTeacherName})</span></TableCell>
+                    <TableCell>
+                      {item.halaqahName === '-' ? (
+                        '-'
+                      ) : (
+                        <>
+                          {item.halaqahName}{' '}
+                          {item.rawTeacherName && item.rawTeacherName !== '-' && (
+                            <span className="text-xs text-muted-foreground">({item.rawTeacherName})</span>
+                          )}
+                        </>
+                      )}
+                    </TableCell>
                     <TableCell>{attendanceBadge(item.attendanceStatus)}</TableCell>
                     <TableCell>
                       {item.selectedTypeRecordCount > 0 ? (
@@ -310,12 +357,14 @@ export function SetoranClient({
       </div>
 
       <SetoranDialog
+        key={inputStudent ? `${inputStudent.id}-${inputOpen}` : 'closed'}
         open={inputOpen}
         onOpenChange={setInputOpen}
         student={inputStudent}
         selectedDate={params.date}
         type={params.type}
         role={role}
+        surahs={surahs}
       />
 
       <RiwayatDialog

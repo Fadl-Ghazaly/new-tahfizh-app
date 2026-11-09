@@ -10,7 +10,7 @@ interface SidebarProps {
 export function Sidebar({ role, schoolName, logoUrl }: SidebarProps) {
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-50 hidden w-72 flex-col bg-sidebar text-primary-foreground shadow-[0_4px_24px_rgba(0,0,0,0.18)] md:flex"
+      className="fixed inset-y-0 left-0 z-50 hidden w-72 flex-col bg-sidebar text-primary-foreground shadow-[0_4px_24px_rgba(0,0,0,0.18)] md:flex print:hidden"
       aria-label="Navigasi utama"
     >
       {/* Header Sidebar — logo + nama pesantren */}

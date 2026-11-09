@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
+import { formatSetoranDateIndonesian } from '@/lib/setoran/dialog-state';
 import { voidSetoran } from './actions';
 import { toast } from 'sonner';
 
@@ -39,6 +41,9 @@ export function RiwayatDialog({
   student,
   selectedDate,
 }: RiwayatDialogProps) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
   const [voidDialogOpen, setVoidDialogOpen] = useState<boolean>(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [reason, setReason] = useState<string>('');
@@ -68,6 +73,9 @@ export function RiwayatDialog({
         toast.success('Setoran berhasil dibatalkan (VOID).');
         setVoidDialogOpen(false);
         onOpenChange(false);
+        startTransition(() => {
+          router.refresh();
+        });
       }
     } catch {
       toast.error('Gagal memproses pembatalan.');
@@ -82,7 +90,7 @@ export function RiwayatDialog({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Riwayat Setoran Hari Ini</DialogTitle>
-            <p className="text-sm text-muted-foreground">{student.name} &mdash; {selectedDate}</p>
+            <p className="text-sm text-muted-foreground">{student.name} &mdash; {formatSetoranDateIndonesian(selectedDate)}</p>
           </DialogHeader>
 
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">

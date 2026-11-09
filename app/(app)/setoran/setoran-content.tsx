@@ -3,8 +3,15 @@ import { createClient } from '@/lib/supabase/server';
 import { parseSetoranParams } from '@/lib/validators/setoran-params';
 import { EmptyState } from '@/components/layout/empty-state';
 import { BookOpenCheck } from 'lucide-react';
-import { SetoranClient, StudentSetoranItem, SetoranClientClassOption, SetoranClientTeacherOption } from './setoran-client';
+import {
+  SetoranClient,
+  StudentSetoranItem,
+  SetoranClientClassOption,
+  SetoranClientTeacherOption,
+  SetoranSurahOption,
+} from './setoran-client';
 import { allowedDateWindow } from '@/lib/setoran/rules';
+import { calculateStudentRowSummary } from '@/lib/setoran/dialog-state';
 import { MemorizationRecordRow } from './riwayat-dialog';
 
 export async function SetoranContent({
@@ -70,27 +77,59 @@ export async function SetoranContent({
   const validated = parseSetoranParams(rawParams, role, todayIso);
   const dateLimits = allowedDateWindow(role, todayIso);
 
-  const [classesRes, teachersRes] = await Promise.all([
+  const [classesRes, teachersRes, surahsRes] = await Promise.all([
     supabase.from('classes').select('id, name, level').order('level', { ascending: true }),
     role === 'ADMIN' ? supabase.from('teachers').select('id, name').eq('is_active', true).order('name') : Promise.resolve({ data: [] }),
+    supabase.from('quran_surahs').select('id, number, name_latin').order('number', { ascending: true }),
   ]);
 
   const classes: SetoranClientClassOption[] = classesRes.data || [];
   const teachers: SetoranClientTeacherOption[] = teachersRes.data || [];
+  const surahs: SetoranSurahOption[] = (surahsRes.data || []).map((s) => ({
+    id: s.id,
+    number: s.number,
+    nameLatin: s.name_latin,
+  }));
+
+  // Resolve target halaqah IDs for ustadz restriction or admin ustadz filter
+  const targetTeacherId = role === 'USTADZ' ? teacherId : (validated.ustadzId !== 'all' ? validated.ustadzId : null);
+  let targetHalaqahIds: string[] | null = null;
+
+  if (targetTeacherId) {
+    const { data: halaqahRows } = await supabase
+      .from('halaqahs')
+      .select('id')
+      .eq('teacher_id', targetTeacherId)
+      .eq('is_active', true);
+
+    targetHalaqahIds = (halaqahRows || []).map((h) => h.id);
+  }
 
   let query = supabase
     .from('students')
-    .select('id, nisn, name, gender, class_id, classes(name, level), halaqahs(id, name, teacher_id, teachers(name))', { count: 'exact' })
+    .select('id, nisn, name, gender, class_id, halaqah_id, classes(name, level), halaqahs(id, name, teacher_id, teachers(name))', { count: 'exact' })
     .eq('status', 'ACTIVE');
 
-  if (role === 'USTADZ' && teacherId) {
-    query = query.eq('halaqahs.teacher_id', teacherId);
-  } else if (role === 'ADMIN' && validated.ustadzId !== 'all') {
-    query = query.eq('halaqahs.teacher_id', validated.ustadzId);
+  // Filter halaqah on main students table
+  if (targetHalaqahIds !== null) {
+    if (targetHalaqahIds.length > 0) {
+      query = query.in('halaqah_id', targetHalaqahIds);
+    } else {
+      query = query.eq('halaqah_id', '00000000-0000-0000-0000-000000000000');
+    }
   }
 
+  // Filter class on main students table
   if (validated.classLevel !== 'all') {
-    query = query.eq('classes.level', validated.classLevel);
+    const matchingClassIds = classes
+      .filter((c) => c.level === validated.classLevel)
+      .map((c) => c.id);
+
+    if (matchingClassIds.length > 0) {
+      query = query.in('class_id', matchingClassIds);
+    } else {
+      query = query.eq('class_id', '00000000-0000-0000-0000-000000000000');
+    }
   }
 
   if (validated.search) {
@@ -162,8 +201,7 @@ export async function SetoranContent({
     }
 
     const allRecords = dailyRecords[s.id] || [];
-    const recordsForType = allRecords.filter((r) => r.type === validated.type);
-    const totalLines = recordsForType.reduce((acc, r) => acc + (r.line_count || 0), 0);
+    const summary = calculateStudentRowSummary(s.id, attendances, allRecords, validated.type);
 
     return {
       id: s.id,
@@ -171,9 +209,9 @@ export async function SetoranContent({
       className,
       halaqahName,
       rawTeacherName,
-      attendanceStatus: attendances[s.id] || null,
-      selectedTypeRecordCount: recordsForType.length,
-      selectedTypeTotalLines: totalLines,
+      attendanceStatus: summary.attendanceStatus,
+      selectedTypeRecordCount: summary.selectedTypeRecordCount,
+      selectedTypeTotalLines: summary.selectedTypeTotalLines,
       allDailyRecords: allRecords,
     };
   });
@@ -185,6 +223,7 @@ export async function SetoranContent({
       dateLimits={dateLimits}
       classes={classes}
       teachers={teachers}
+      surahs={surahs}
       items={items}
       totalCount={count || 0}
     />

@@ -66,7 +66,7 @@ export function MobileNav({ role, userName }: MobileNavProps) {
       {/* Bottom Navigation Bar */}
       <nav
         aria-label="Navigasi bawah"
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/90 pb-safe backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.04)] md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/90 pb-safe backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.04)] md:hidden print:hidden"
       >
         <div className="flex h-20 items-center justify-around px-2">
           {primaryNav.map(({ label, href, Icon, fab }) => {

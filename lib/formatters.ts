@@ -32,6 +32,21 @@ export function formatGender(gender: string | null | undefined): string {
   return optionLabel(getGenderOptions(), gender, '-');
 }
 
+/**
+ * Mengembalikan label tanggal Indonesia resmi untuk cetakan dokumen.
+ * Contoh: "9 November 2026"
+ */
+export function formatPrintDateIndonesian(date: Date = new Date()): string {
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
 export function resolveHalaqahOnClassChange(
   newClassId: string,
   currentHalaqahId: string,

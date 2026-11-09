@@ -63,11 +63,11 @@ export default async function AppLayout({
 
       {/* Konten utama */}
       <main
-        className="flex min-h-screen flex-col pt-16 md:pl-72"
+        className="flex min-h-screen flex-col pt-16 md:pl-72 print:pt-0 print:pl-0"
         id="main-content"
         tabIndex={-1}
       >
-        <div className="flex-1 px-4 py-6 pb-28 md:px-6 md:pb-6">
+        <div className="flex-1 px-4 py-6 pb-28 md:px-6 md:pb-6 print:p-0">
           {children}
         </div>
       </main>
