@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { formatSetoranDateIndonesian } from '@/lib/setoran/dialog-state';
+import type { SetoranSurahOption } from './setoran-client';
 import { voidSetoran } from './actions';
 import { toast } from 'sonner';
 
@@ -33,6 +34,7 @@ export interface RiwayatDialogProps {
     records: MemorizationRecordRow[];
   } | null;
   selectedDate: string;
+  surahs?: SetoranSurahOption[];
 }
 
 export function RiwayatDialog({
@@ -40,6 +42,7 @@ export function RiwayatDialog({
   onOpenChange,
   student,
   selectedDate,
+  surahs = [],
 }: RiwayatDialogProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -97,12 +100,17 @@ export function RiwayatDialog({
             {student.records.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Belum ada setoran hafalan aktif pada tanggal ini.</p>
             ) : (
-              student.records.map((r) => (
+              student.records.map((r) => {
+                const surahMeta = surahs.find((s) => s.id === r.surah_id);
+                const surahLabel = surahMeta
+                  ? `${surahMeta.number}. ${surahMeta.nameLatin}`
+                  : `Surat ${r.surah_id}`;
+                return (
                 <div key={r.id} className="p-3 border rounded-lg flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{r.type}</Badge>
-                      <span className="text-sm font-medium">Juz {r.juz}, Surat {r.surah_id}:{r.ayah_start}-{r.ayah_end}</span>
+                      <span className="text-sm font-medium">Juz {r.juz}, {surahLabel}:{r.ayah_start}-{r.ayah_end}</span>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {r.line_count} baris &bull; Nilai {r.fluency_score} ({r.mistake_count} salah)
@@ -113,7 +121,8 @@ export function RiwayatDialog({
                     Batalkan
                   </Button>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 

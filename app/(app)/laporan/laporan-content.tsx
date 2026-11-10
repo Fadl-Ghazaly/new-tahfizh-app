@@ -150,7 +150,7 @@ export async function LaporanContent({
   const prev1Range = twoPrevMonths[0];
   const prev2Range = twoPrevMonths[1];
 
-  // 7. Parallel fetch attendance, records in month, and historical records
+  // 7. Parallel fetch attendance, records in month, and historical records via views
   const emptyRes = { data: [] };
   const [
     attendanceRes,
@@ -165,7 +165,8 @@ export async function LaporanContent({
           .select('student_id, status, date')
           .gte('date', startDate)
           .lte('date', endDate)
-          .in('student_id', studentIds),
+          .in('student_id', studentIds)
+          .limit(10000),
         supabase
           .from('memorization_records')
           .select('id, student_id, date, type, juz, surah_id, ayah_start, ayah_end, line_count, mistake_count, fluency_score, notes')
@@ -173,28 +174,21 @@ export async function LaporanContent({
           .lte('date', endDate)
           .eq('status', 'ACTIVE')
           .in('student_id', studentIds)
-          .order('date', { ascending: true }),
+          .order('date', { ascending: true })
+          .limit(10000),
         supabase
-          .from('memorization_records')
-          .select('student_id, line_count')
-          .eq('type', 'SABAQ')
-          .eq('status', 'ACTIVE')
+          .from('v_student_rankings')
+          .select('student_id, total_sabaq_lines')
           .in('student_id', studentIds),
         supabase
-          .from('memorization_records')
-          .select('student_id, line_count')
-          .gte('date', prev1Range.startDate)
-          .lte('date', prev1Range.endDate)
-          .eq('type', 'SABAQ')
-          .eq('status', 'ACTIVE')
+          .from('v_student_monthly_progress')
+          .select('student_id, monthly_sabaq_lines')
+          .eq('month_start', prev1Range.startDate)
           .in('student_id', studentIds),
         supabase
-          .from('memorization_records')
-          .select('student_id, line_count')
-          .gte('date', prev2Range.startDate)
-          .lte('date', prev2Range.endDate)
-          .eq('type', 'SABAQ')
-          .eq('status', 'ACTIVE')
+          .from('v_student_monthly_progress')
+          .select('student_id, monthly_sabaq_lines')
+          .eq('month_start', prev2Range.startDate)
           .in('student_id', studentIds),
       ])
     : [emptyRes, emptyRes, emptyRes, emptyRes, emptyRes];
@@ -231,22 +225,22 @@ export async function LaporanContent({
     studentMonthRecordsMap.get(r.student_id)!.push(r as RecordDbRow);
   });
 
-  // Index lifetime sabaq lines by student_id
+  // Index lifetime sabaq lines by student_id (from v_student_rankings)
   const lifetimeSabaqMap = new Map<string, number>();
   (lifetimeSabaqRes.data || []).forEach((r) => {
-    lifetimeSabaqMap.set(r.student_id, (lifetimeSabaqMap.get(r.student_id) || 0) + (r.line_count || 0));
+    lifetimeSabaqMap.set(r.student_id, Number(r.total_sabaq_lines || 0));
   });
 
-  // Index prev1 sabaq lines by student_id
+  // Index prev1 sabaq lines by student_id (from v_student_monthly_progress)
   const prev1SabaqMap = new Map<string, number>();
   (prev1SabaqRes.data || []).forEach((r) => {
-    prev1SabaqMap.set(r.student_id, (prev1SabaqMap.get(r.student_id) || 0) + (r.line_count || 0));
+    prev1SabaqMap.set(r.student_id, Number(r.monthly_sabaq_lines || 0));
   });
 
-  // Index prev2 sabaq lines by student_id
+  // Index prev2 sabaq lines by student_id (from v_student_monthly_progress)
   const prev2SabaqMap = new Map<string, number>();
   (prev2SabaqRes.data || []).forEach((r) => {
-    prev2SabaqMap.set(r.student_id, (prev2SabaqMap.get(r.student_id) || 0) + (r.line_count || 0));
+    prev2SabaqMap.set(r.student_id, Number(r.monthly_sabaq_lines || 0));
   });
 
   // 8. Build monthly summaries

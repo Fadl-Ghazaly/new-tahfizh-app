@@ -33,7 +33,12 @@ export function FilterBar({
   }));
 
   const currentYear = new Date().getFullYear();
-  const yearOptions = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map((y) => ({
+  const baseYears = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+  if (!baseYears.includes(params.year)) {
+    baseYears.push(params.year);
+    baseYears.sort((a, b) => a - b);
+  }
+  const yearOptions = baseYears.map((y) => ({
     value: String(y),
     label: String(y),
   }));
@@ -105,7 +110,7 @@ export function FilterBar({
           <label className="text-xs font-medium text-muted-foreground block mb-1">Kelas</label>
           <Select
             value={params.classLevel === 'all' ? 'all' : String(params.classLevel)}
-            onValueChange={(val) => onParamChange({ classLevel: val || 'all' })}
+            onValueChange={(val) => onParamChange({ classLevel: val || 'all', studentId: '' })}
           >
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Semua Kelas">
@@ -128,7 +133,7 @@ export function FilterBar({
             <label className="text-xs font-medium text-muted-foreground block mb-1">Ustadz</label>
             <Select
               value={params.ustadzId}
-              onValueChange={(val) => onParamChange({ ustadzId: val || 'all' })}
+              onValueChange={(val) => onParamChange({ ustadzId: val || 'all', studentId: '' })}
             >
               <SelectTrigger className="w-44">
                 <SelectValue placeholder="Semua Ustadz">

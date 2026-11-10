@@ -1,54 +1,39 @@
-import { redirect } from 'next/navigation';
-import { connection } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { Suspense } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
-import { EmptyState } from '@/components/layout/empty-state';
-import { Settings } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PengaturanContent } from './pengaturan-content';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Pengaturan — Tahfizh App',
-  description: 'Pengaturan aplikasi pesantren.',
+  description: 'Pengaturan profil pengguna dan konfigurasi sistem aplikasi.',
 };
 
-// instant = false dipertahankan: halaman memeriksa role ADMIN di server-side sebelum merender konten formulir.
-export const instant = false;
+function PengaturanSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="md:col-span-1 space-y-3">
+        <Skeleton className="h-44 w-full rounded-xl" />
+        <Skeleton className="h-28 w-full rounded-xl" />
+      </div>
+      <div className="md:col-span-3 space-y-4">
+        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
+    </div>
+  );
+}
 
-export default async function PengaturanPage() {
-  await connection();
-  const supabase = await createClient();
-
-  // Verifikasi role ADMIN di server — bukan hanya di proxy/UI
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || profile.role !== 'ADMIN') {
-    // Redirect dengan pesan — ditangkap oleh dashboard via searchParams
-    redirect('/dashboard?error=unauthorized');
-  }
-
+export default function PengaturanPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Pengaturan"
-        description="Kelola pengaturan pesantren, tema, dan konfigurasi aplikasi."
+        description="Kelola profil akun, keamanan kata sandi, dan konfigurasi pesantren."
       />
-      <EmptyState
-        icon={<Settings className="h-8 w-8 text-primary" />}
-        title="Fitur ini sedang dikembangkan"
-        description="Pengaturan nama pesantren, logo, tema, dan tahun ajaran akan tersedia pada fase berikutnya."
-      />
+      <Suspense fallback={<PengaturanSkeleton />}>
+        <PengaturanContent />
+      </Suspense>
     </div>
   );
 }

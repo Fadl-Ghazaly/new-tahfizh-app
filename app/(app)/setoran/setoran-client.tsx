@@ -77,7 +77,18 @@ export function SetoranClient({
   const [isPending, startTransition] = useTransition();
 
   const [dateInput, setDateInput] = useState<string>(params.date);
+  const [prevDate, setPrevDate] = useState<string>(params.date);
+  if (params.date !== prevDate) {
+    setPrevDate(params.date);
+    setDateInput(params.date);
+  }
+
   const [searchInput, setSearchInput] = useState<string>(params.search);
+  const [prevSearch, setPrevSearch] = useState<string>(params.search);
+  if (params.search !== prevSearch) {
+    setPrevSearch(params.search);
+    setSearchInput(params.search);
+  }
 
   const [inputStudent, setInputStudent] = useState<SetoranDialogStudent | null>(null);
   const [inputOpen, setInputOpen] = useState<boolean>(false);
@@ -372,6 +383,7 @@ export function SetoranClient({
         onOpenChange={setRiwayatOpen}
         student={riwayatStudent}
         selectedDate={params.date}
+        surahs={surahs}
       />
     </div>
   );
