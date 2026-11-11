@@ -29,6 +29,7 @@ export interface ClassOption {
 export interface TeacherRow {
   id: string;
   name: string;
+  email?: string;
   gender: string;
   whatsapp: string;
   boarding_school: string | null;
@@ -289,6 +290,7 @@ export function UstadzClient({
               <TableRow>
                 <TableHead className="w-12">No</TableHead>
                 <TableHead>Nama Ustadz</TableHead>
+                <TableHead>Email Akun</TableHead>
                 <TableHead>JK</TableHead>
                 <TableHead>No WA</TableHead>
                 <TableHead>Asal Pondok</TableHead>
@@ -302,7 +304,7 @@ export function UstadzClient({
               {teachers.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={isAdmin ? 9 : 8}
+                    colSpan={isAdmin ? 10 : 9}
                     className="text-center py-12 text-muted-foreground"
                   >
                     Belum ada data atau tidak ada hasil untuk filter ini.
@@ -315,6 +317,7 @@ export function UstadzClient({
                     <TableRow key={t.id} className={!t.is_active ? 'opacity-60 bg-muted/30' : ''}>
                       <TableCell className="font-medium">{rowNumber}</TableCell>
                       <TableCell className="font-semibold">{withUstadzTitle(t.name)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{t.email || '-'}</TableCell>
                       <TableCell>
                         <Badge variant={t.gender === 'L' ? 'default' : 'secondary'}>
                           {t.gender}

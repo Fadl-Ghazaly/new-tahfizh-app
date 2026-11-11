@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseListParams, mapDbError } from '../lib/validators/list-params'
 import { validateStudentHalaqahRule } from '../lib/validators/santri-rules'
+import { buildUstadzEmailFromName } from '../lib/ustadz/provision-email'
 
 describe('parseListParams', () => {
   it('whitelists unicode letters, spaces, hyphens, and apostrophes', () => {
@@ -85,5 +86,17 @@ describe('validateStudentHalaqahRule', () => {
     const res = validateStudentHalaqahRule('class-7a', null)
     expect(res.valid).toBe(false)
     expect(res.error).toMatch(/tidak ditemukan/)
+  })
+})
+
+describe('buildUstadzEmailFromName', () => {
+  it('generates clean email from Ustadz / Ustadzah names', () => {
+    expect(buildUstadzEmailFromName('Ust. Daniswara Perdana')).toBe('daniswara.perdana@darulilmi.test')
+    expect(buildUstadzEmailFromName('Ustadzah Calista Oktaviani')).toBe('calista.oktaviani@darulilmi.test')
+  })
+
+  it('deduplicates email when usedEmails set is provided', () => {
+    const used = new Set<string>(['fadl.muhammad.ghazaly@darulilmi.test'])
+    expect(buildUstadzEmailFromName('Fadl Muhammad Ghazaly', used)).toBe('fadl.muhammad.ghazaly.2@darulilmi.test')
   })
 })

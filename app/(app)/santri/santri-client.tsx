@@ -58,6 +58,7 @@ interface SantriClientProps {
   classes: ClassOption[];
   activeHalaqahs: HalaqahOption[];
   isAdmin: boolean;
+  canEdit?: boolean;
   currentPage: number;
   pageSize: number;
   currentSearch: string;
@@ -73,6 +74,7 @@ export function SantriClient({
   classes,
   activeHalaqahs,
   isAdmin,
+  canEdit = isAdmin,
   currentPage,
   pageSize,
   currentSearch,
@@ -374,14 +376,14 @@ export function SantriClient({
                 <TableHead>Orangtua</TableHead>
                 <TableHead>WA Orangtua</TableHead>
                 <TableHead>Status</TableHead>
-                {isAdmin && <TableHead className="text-right">Aksi</TableHead>}
+                {canEdit && <TableHead className="text-right">Aksi</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {students.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={isAdmin ? 11 : 10}
+                    colSpan={canEdit ? 11 : 10}
                     className="text-center py-12 text-muted-foreground"
                   >
                     Belum ada data atau tidak ada hasil untuk filter ini.
@@ -411,7 +413,7 @@ export function SantriClient({
                           {s.status === 'ACTIVE' ? 'Aktif' : s.status === 'INACTIVE' ? 'Nonaktif' : 'Lulus'}
                         </Badge>
                       </TableCell>
-                      {isAdmin && (
+                      {canEdit && (
                         <TableCell className="text-right space-x-1">
                           <Button
                             variant="ghost"
@@ -422,28 +424,30 @@ export function SantriClient({
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          {s.status === 'ACTIVE' ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Nonaktifkan Santri"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setStatusDialog({ open: true, student: s, targetStatus: 'INACTIVE' })}
-                              aria-label={`Nonaktifkan ${s.name}`}
-                            >
-                              <UserX className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Aktifkan Kembali"
-                              className="text-green-600 hover:text-green-700"
-                              onClick={() => setStatusDialog({ open: true, student: s, targetStatus: 'ACTIVE' })}
-                              aria-label={`Aktifkan ${s.name}`}
-                            >
-                              <UserCheck className="h-4 w-4" />
-                            </Button>
+                          {isAdmin && (
+                            s.status === 'ACTIVE' ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Nonaktifkan Santri"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setStatusDialog({ open: true, student: s, targetStatus: 'INACTIVE' })}
+                                aria-label={`Nonaktifkan ${s.name}`}
+                              >
+                                <UserX className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Aktifkan Kembali"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => setStatusDialog({ open: true, student: s, targetStatus: 'ACTIVE' })}
+                                aria-label={`Aktifkan ${s.name}`}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                              </Button>
+                            )
                           )}
                         </TableCell>
                       )}
@@ -595,6 +599,7 @@ export function SantriClient({
                 <Label htmlFor="class_id">Kelas</Label>
                 <Select
                   value={formClassId}
+                  disabled={!isAdmin}
                   onValueChange={(val) => {
                     if (val) handleClassChange(val);
                   }}
@@ -629,6 +634,7 @@ export function SantriClient({
               <Label htmlFor="halaqah_id">Kelas Halaqah</Label>
               <Select
                 value={formHalaqahId}
+                disabled={!isAdmin}
                 onValueChange={(v) => {
                   if (v) {
                     setFormHalaqahId(v);
@@ -709,7 +715,7 @@ export function SantriClient({
               </div>
             </div>
 
-            {editingStudent && (
+            {editingStudent && isAdmin && (
               <div className="space-y-2 min-w-0">
                 <Label htmlFor="status">Status</Label>
                 <Select value={formStatus} onValueChange={(v) => v && setFormStatus(v)}>

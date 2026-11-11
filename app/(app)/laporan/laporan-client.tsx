@@ -29,6 +29,8 @@ export interface LaporanClientProps {
   monthlySummaries: MonthlyStudentSummaryRow[];
   studentCardData: StudentMutabaahCardData | null;
   halaqahPerformanceRows: HalaqahPerformanceRow[];
+  schoolName?: string;
+  logoUrl?: string | null;
 }
 
 export function LaporanClient({
@@ -40,6 +42,8 @@ export function LaporanClient({
   monthlySummaries,
   studentCardData,
   halaqahPerformanceRows,
+  schoolName = 'Pesantren Darul Ilmi',
+  logoUrl = null,
 }: LaporanClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -153,13 +157,19 @@ export function LaporanClient({
           periodLabel={periodLabel}
           classLabel={classLabel}
           ustadzLabel={ustadzLabel}
+          schoolName={schoolName}
+          logoUrl={logoUrl}
         />
       )}
 
       {params.tab === 'mutabaah-santri' && (
         <>
           {studentCardData ? (
-            <MutabaahSantriCard cardData={studentCardData} />
+            <MutabaahSantriCard
+              cardData={studentCardData}
+              schoolName={schoolName}
+              logoUrl={logoUrl}
+            />
           ) : (
             <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground shadow-sm">
               Tidak ada data santri yang ditemukan pada filter ini untuk menampilkan Kartu Mutaba&apos;ah.
@@ -172,6 +182,8 @@ export function LaporanClient({
         <KinerjaHalaqahTable
           rows={halaqahPerformanceRows}
           periodLabel={periodLabel}
+          schoolName={schoolName}
+          logoUrl={logoUrl}
         />
       )}
     </div>

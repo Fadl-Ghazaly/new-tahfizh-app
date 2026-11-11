@@ -22,6 +22,7 @@ import {
   StudentFilterOption,
 } from '@/lib/laporan/types';
 import { barisKeJuzHalaman, formatCapaian, persenProgress } from '@/lib/tahfizh';
+import { getPublicSchoolSettings } from '@/lib/settings';
 import { LaporanClient } from './laporan-client';
 
 export async function LaporanContent({
@@ -380,8 +381,9 @@ export async function LaporanContent({
     }
   }
 
-  // 11. Aggregate Halaqah Performance
+  // 11. Aggregate Halaqah Performance & School Settings for Print Header
   const halaqahRows = aggregateHalaqahPerformance(monthlySummaries);
+  const schoolSettings = await getPublicSchoolSettings();
 
   return (
     <LaporanClient
@@ -393,6 +395,8 @@ export async function LaporanContent({
       monthlySummaries={monthlySummaries}
       studentCardData={selectedStudentCard}
       halaqahPerformanceRows={halaqahRows}
+      schoolName={schoolSettings.school_name}
+      logoUrl={schoolSettings.logo_url}
     />
   );
 }

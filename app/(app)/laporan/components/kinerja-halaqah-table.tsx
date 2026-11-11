@@ -8,9 +8,16 @@ import { formatPrintDateIndonesian } from '@/lib/formatters';
 export interface KinerjaHalaqahTableProps {
   rows: HalaqahPerformanceRow[];
   periodLabel?: string;
+  schoolName?: string;
+  logoUrl?: string | null;
 }
 
-export function KinerjaHalaqahTable({ rows, periodLabel }: KinerjaHalaqahTableProps) {
+export function KinerjaHalaqahTable({
+  rows,
+  periodLabel,
+  schoolName = 'PESANTREN DARUL ILMI',
+  logoUrl = null,
+}: KinerjaHalaqahTableProps) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground shadow-sm print:border-none print:p-6">
@@ -23,8 +30,14 @@ export function KinerjaHalaqahTable({ rows, periodLabel }: KinerjaHalaqahTablePr
     <div className="space-y-4 print:space-y-6">
       {/* KOP Dokumen Resmi Khusus Cetak */}
       <div className="hidden print:block border-b-2 border-black pb-4 text-center space-y-1">
+        {logoUrl && (
+          <div className="flex justify-center pb-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt="Logo Pesantren" className="h-12 w-12 object-contain" />
+          </div>
+        )}
         <h1 className="text-xl font-bold tracking-tight uppercase text-black">
-          PESANTREN DARUL ILMI
+          {schoolName}
         </h1>
         <p className="text-xs uppercase tracking-widest font-semibold text-black">
           Lembaga Tahfizh Al-Qur&apos;an &bull; Mushaf Madinah Standar 300 Baris / Juz

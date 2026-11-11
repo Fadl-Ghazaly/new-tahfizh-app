@@ -1,6 +1,9 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth/require-admin'
+import { requireUser } from '@/lib/auth/require-user'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { studentSchema } from '@/lib/validators/santri'
 import { validateStudentHalaqahRule } from '@/lib/validators/santri-rules'
 import { mapDbError } from '@/lib/validators/list-params'
@@ -56,9 +59,15 @@ export async function createStudent(rawInput: unknown) {
 }
 
 export async function updateStudent(id: string, rawInput: unknown) {
-  const { error: authError, supabase } = await requireAdmin()
-  if (authError || !supabase) {
-    return { ok: false, error: authError || 'Akses ditolak.' }
+  let authUser;
+  try {
+    authUser = await requireUser()
+  } catch {
+    return { ok: false, error: 'Unauthorized: Sesi tidak valid atau belum login.' }
+  }
+
+  if (!authUser.isActive) {
+    return { ok: false, error: 'Akun Anda sedang tidak aktif.' }
   }
 
   const parsed = studentSchema.safeParse(rawInput)
@@ -67,6 +76,53 @@ export async function updateStudent(id: string, rawInput: unknown) {
   }
 
   const data = parsed.data
+  const supabase = await createClient()
+
+  // Jika role USTADZ, wajib verifikasi bahwa santri berada di halaqah yang dijaga oleh ustadz tersebut
+  if (authUser.role === 'USTADZ') {
+    if (!authUser.teacherId) {
+      return { ok: false, error: 'Akses ditolak. Akun Anda belum terhubung ke data ustadz.' }
+    }
+
+    const { data: existingStudent, error: stuErr } = await supabase
+      .from('students')
+      .select('id, halaqah_id, class_id, status')
+      .eq('id', id)
+      .single()
+
+    if (stuErr || !existingStudent) {
+      return { ok: false, error: 'Data santri tidak ditemukan.' }
+    }
+
+    const { data: currentHalaqah } = await supabase
+      .from('halaqahs')
+      .select('id, teacher_id, class_id, is_active')
+      .eq('id', existingStudent.halaqah_id)
+      .single()
+
+    if (!currentHalaqah || currentHalaqah.teacher_id !== authUser.teacherId) {
+      return {
+        ok: false,
+        error: 'Akses ditolak. Anda hanya dapat mengedit santri pada halaqah yang Anda jaga.',
+      }
+    }
+
+    // Pastikan ustadz tidak memindahkan santri ke halaqah ustadz lain
+    if (data.halaqah_id !== existingStudent.halaqah_id) {
+      const { data: targetHalaqah } = await supabase
+        .from('halaqahs')
+        .select('id, teacher_id, class_id, is_active')
+        .eq('id', data.halaqah_id)
+        .single()
+
+      if (!targetHalaqah || targetHalaqah.teacher_id !== authUser.teacherId) {
+        return {
+          ok: false,
+          error: 'Akses ditolak. Anda tidak dapat memindahkan santri ke halaqah ustadz lain.',
+        }
+      }
+    }
+  }
 
   // Verify halaqah rule
   const { data: halaqah, error: halaqahError } = await supabase
@@ -84,7 +140,10 @@ export async function updateStudent(id: string, rawInput: unknown) {
     return { ok: false, error: ruleCheck.error }
   }
 
-  const { error: updateError } = await supabase
+  // Gunakan adminClient bila tersedia agar update oleh USTADZ yang sudah terverifikasi tidak terhalang RLS students_update_admin
+  const writeClient = createAdminClient() || supabase
+
+  const { error: updateError } = await writeClient
     .from('students')
     .update({
       nisn: data.nisn,
@@ -114,7 +173,6 @@ export async function setStudentStatus(id: string, status: 'ACTIVE' | 'INACTIVE'
   }
 
   if (status === 'ACTIVE') {
-    // Check if student's halaqah is active
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('halaqah_id')

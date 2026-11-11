@@ -19,11 +19,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { theme } = await getPublicSchoolSettings();
+  const { theme, logo_url } = await getPublicSchoolSettings();
 
   return (
     <html lang="id" data-theme={theme} className={`${jakarta.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
+        {logo_url && <link rel="icon" href={logo_url} />}
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           rel="stylesheet"

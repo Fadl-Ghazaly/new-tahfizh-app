@@ -14,32 +14,63 @@ export async function SantriContent({
 
   const supabase = await createClient();
 
-  // 1. Fetch user role
+  // 1. Fetch user role & linked teacher (if USTADZ)
   const { data: { user } } = await supabase.auth.getUser();
   let isAdmin = false;
+  let role: 'ADMIN' | 'USTADZ' = 'USTADZ';
+  let ustadzTeacherId: string | null = null;
+
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, is_active')
       .eq('id', user.id)
       .single();
-    isAdmin = profile?.role === 'ADMIN' && profile?.is_active === true;
+
+    if (profile?.is_active) {
+      role = profile.role as 'ADMIN' | 'USTADZ';
+      isAdmin = role === 'ADMIN';
+    }
+
+    if (role === 'USTADZ') {
+      const { data: teacher } = await supabase
+        .from('teachers')
+        .select('id, is_active')
+        .eq('profile_id', user.id)
+        .maybeSingle();
+
+      if (teacher && teacher.is_active) {
+        ustadzTeacherId = teacher.id;
+      }
+    }
   }
 
-  // 2. Fetch active classes & halaqahs for form options
+  // 2. Fetch active classes & halaqahs
   const [classesRes, halaqahsRes] = await Promise.all([
     supabase.from('classes').select('id, name, level').order('level', { ascending: true }),
-    supabase.from('halaqahs').select('id, name, class_id, is_active, teachers(name)').eq('is_active', true),
+    supabase
+      .from('halaqahs')
+      .select('id, name, class_id, teacher_id, is_active, teachers(name)')
+      .eq('is_active', true),
   ]);
 
-  const classes: ClassOption[] = (classesRes.data || []).map((c) => ({
+  const allClasses: ClassOption[] = (classesRes.data || []).map((c) => ({
     id: c.id,
     name: c.name,
     level: c.level,
   }));
 
-  const activeHalaqahs: HalaqahOption[] = (halaqahsRes.data || []).map((h) => {
-    const teacherName = Array.isArray(h.teachers) ? h.teachers[0]?.name : (h.teachers as { name: string } | null)?.name;
+  const rawHalaqahs = halaqahsRes.data || [];
+  const filteredRawHalaqahs = isAdmin
+    ? rawHalaqahs
+    : rawHalaqahs.filter((h) => ustadzTeacherId !== null && h.teacher_id === ustadzTeacherId);
+
+  const ustadzHalaqahIds = filteredRawHalaqahs.map((h) => h.id);
+
+  const activeHalaqahs: HalaqahOption[] = filteredRawHalaqahs.map((h) => {
+    const teacherName = Array.isArray(h.teachers)
+      ? h.teachers[0]?.name
+      : (h.teachers as { name: string } | null)?.name;
     return {
       id: h.id,
       name: h.name,
@@ -48,18 +79,32 @@ export async function SantriContent({
     };
   });
 
+  // Scope classes dropdown for USTADZ to classes of their own halaqahs
+  const allowedClassIds = new Set(filteredRawHalaqahs.map((h) => h.class_id));
+  const classes: ClassOption[] = isAdmin
+    ? allClasses
+    : allClasses.filter((c) => allowedClassIds.has(c.id));
+
   // 3. Build query for students list
   let query = supabase
     .from('students')
     .select('*, classes(name), halaqahs(name, teachers(name))', { count: 'exact' });
+
+  // RBAC: USTADZ hanya boleh melihat santri pada halaqah yang dijaganya
+  if (!isAdmin) {
+    if (ustadzHalaqahIds.length > 0) {
+      query = query.in('halaqah_id', ustadzHalaqahIds);
+    } else {
+      query = query.eq('halaqah_id', '00000000-0000-0000-0000-000000000000');
+    }
+  }
 
   if (!validated.showInactive) {
     query = query.eq('status', 'ACTIVE');
   }
 
   if (validated.classLevel !== 'all') {
-    // Find class_id corresponding to level
-    const matchedClass = classes.find((c) => c.level === validated.classLevel);
+    const matchedClass = allClasses.find((c) => c.level === validated.classLevel);
     if (matchedClass) {
       query = query.eq('class_id', matchedClass.id);
     }
@@ -79,7 +124,10 @@ export async function SantriContent({
 
   const students: StudentRow[] = (studentsData || []).map((s) => {
     const className = (s.classes as { name: string } | null)?.name || '-';
-    const halaqahObj = s.halaqahs as { name: string; teachers?: { name: string } | { name: string }[] | null } | null;
+    const halaqahObj = s.halaqahs as {
+      name: string;
+      teachers?: { name: string } | { name: string }[] | null;
+    } | null;
     const halaqahName = halaqahObj?.name || '-';
     const tObj = halaqahObj?.teachers;
     const teacherName = Array.isArray(tObj) ? tObj[0]?.name : tObj?.name || '-';
@@ -100,6 +148,8 @@ export async function SantriContent({
     };
   });
 
+  const canEdit = isAdmin || ustadzHalaqahIds.length > 0;
+
   return (
     <SantriClient
       students={students}
@@ -107,6 +157,7 @@ export async function SantriContent({
       classes={classes}
       activeHalaqahs={activeHalaqahs}
       isAdmin={isAdmin}
+      canEdit={canEdit}
       currentPage={validated.page}
       pageSize={validated.limit}
       currentSearch={validated.search}

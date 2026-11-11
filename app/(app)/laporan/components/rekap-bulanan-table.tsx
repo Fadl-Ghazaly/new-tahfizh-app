@@ -12,6 +12,8 @@ export interface RekapBulananTableProps {
   periodLabel?: string;
   classLabel?: string;
   ustadzLabel?: string;
+  schoolName?: string;
+  logoUrl?: string | null;
 }
 
 export function RekapBulananTable({
@@ -20,6 +22,8 @@ export function RekapBulananTable({
   periodLabel,
   classLabel,
   ustadzLabel,
+  schoolName = 'PESANTREN DARUL ILMI',
+  logoUrl = null,
 }: RekapBulananTableProps) {
   if (rows.length === 0) {
     return (
@@ -63,8 +67,14 @@ export function RekapBulananTable({
     <div className="space-y-4 print:space-y-6">
       {/* KOP Dokumen Resmi Khusus Cetak */}
       <div className="hidden print:block border-b-2 border-black pb-4 text-center space-y-1">
+        {logoUrl && (
+          <div className="flex justify-center pb-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt="Logo Pesantren" className="h-12 w-12 object-contain" />
+          </div>
+        )}
         <h1 className="text-xl font-bold tracking-tight uppercase text-black">
-          PESANTREN DARUL ILMI
+          {schoolName}
         </h1>
         <p className="text-xs uppercase tracking-widest font-semibold text-black">
           Lembaga Tahfizh Al-Qur&apos;an &bull; Mushaf Madinah Standar 300 Baris / Juz

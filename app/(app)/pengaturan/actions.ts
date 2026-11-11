@@ -1,11 +1,15 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth/require-admin';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { requireUser } from '@/lib/auth/require-user';
 import {
   schoolSettingsSchema,
+  academicSettingsSchema,
   userProfileSchema,
   changePasswordSchema,
+  toggleUserStatusSchema,
+  adminResetPasswordSchema,
 } from '@/lib/validators/pengaturan';
 import { mapDbError } from '@/lib/validators/list-params';
 import { revalidatePath, revalidateTag } from 'next/cache';
@@ -17,14 +21,40 @@ export interface ActionResult<T = unknown> {
 }
 
 /**
- * Update Pengaturan Sekolah / Pesantren (Khusus ADMIN).
+ * Helper internal: verifikasi pengguna aktif melalui requireUser().
+ */
+async function verifyActiveUser(requireAdminRole = false) {
+  try {
+    const authUser = await requireUser();
+    if (!authUser.isActive) {
+      return { ok: false as const, error: 'Akun Anda sedang tidak aktif.', authUser: null };
+    }
+    if (requireAdminRole && authUser.role !== 'ADMIN') {
+      return {
+        ok: false as const,
+        error: 'Akses ditolak. Hanya Admin yang dapat melakukan tindakan ini.',
+        authUser: null,
+      };
+    }
+    return { ok: true as const, error: null, authUser };
+  } catch {
+    return {
+      ok: false as const,
+      error: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
+      authUser: null,
+    };
+  }
+}
+
+/**
+ * 1. Update Pengaturan Identitas Pesantren & Visual (Khusus ADMIN).
  */
 export async function updateSchoolSettingsAction(
   rawInput: unknown
 ): Promise<ActionResult> {
-  const { error: adminError, supabase, user } = await requireAdmin();
-  if (adminError || !supabase || !user) {
-    return { ok: false, error: adminError || 'Akses ditolak.' };
+  const authCheck = await verifyActiveUser(true);
+  if (!authCheck.ok || !authCheck.authUser) {
+    return { ok: false, error: authCheck.error || 'Akses ditolak.' };
   }
 
   const parsed = schoolSettingsSchema.safeParse(rawInput);
@@ -33,15 +63,15 @@ export async function updateSchoolSettingsAction(
   }
 
   const { school_name, logo_url, theme } = parsed.data;
+  const supabase = await createClient();
 
-  // Cek apakah baris school_settings sudah ada
   const { data: existing, error: fetchError } = await supabase
     .from('school_settings')
     .select('id')
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (fetchError && fetchError.code !== 'PGRST116') {
+  if (fetchError) {
     return { ok: false, error: mapDbError(fetchError) };
   }
 
@@ -53,7 +83,7 @@ export async function updateSchoolSettingsAction(
         school_name,
         logo_url: logo_url || null,
         theme,
-        updated_by: user.id,
+        updated_by: authCheck.authUser.userId,
       })
       .eq('id', existing.id);
     dbError = error;
@@ -62,7 +92,7 @@ export async function updateSchoolSettingsAction(
       school_name,
       logo_url: logo_url || null,
       theme,
-      updated_by: user.id,
+      updated_by: authCheck.authUser.userId,
     });
     dbError = error;
   }
@@ -74,9 +104,10 @@ export async function updateSchoolSettingsAction(
   try {
     revalidateTag('school-settings', 'max');
   } catch {
-    // revalidateTag fallback
+    // Fallback jika revalidateTag tidak tersedia di lingkungan test
   }
   revalidatePath('/pengaturan');
+  revalidatePath('/laporan');
   revalidatePath('/(app)', 'layout');
   revalidatePath('/', 'layout');
 
@@ -84,19 +115,156 @@ export async function updateSchoolSettingsAction(
 }
 
 /**
- * Update Profil Pengguna Saat Ini (Bisa ADMIN & USTADZ).
+ * 2. Update Konfigurasi Akademik & Standar Perhitungan Tahfizh (Khusus ADMIN).
+ */
+export async function updateAcademicSettingsAction(
+  rawInput: unknown
+): Promise<ActionResult> {
+  const authCheck = await verifyActiveUser(true);
+  if (!authCheck.ok || !authCheck.authUser) {
+    return { ok: false, error: authCheck.error || 'Akses ditolak.' };
+  }
+
+  const parsed = academicSettingsSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  const academicConfig = parsed.data;
+  const supabase = await createClient();
+
+  // Simpan pada metadata akun Admin di Supabase PostgreSQL (auth.users)
+  const { error: metaError } = await supabase.auth.updateUser({
+    data: { academic_config: academicConfig },
+  });
+
+  if (metaError) {
+    return {
+      ok: false,
+      error: 'Gagal menyimpan konfigurasi akademik. Silakan coba lagi.',
+    };
+  }
+
+  // Sinkronkan juga ke app_metadata via Admin Client bila tersedia agar terbaca lintas sesi Admin
+  const adminClient = createAdminClient();
+  if (adminClient) {
+    try {
+      await adminClient.auth.admin.updateUserById(authCheck.authUser.userId, {
+        app_metadata: { academic_config: academicConfig },
+      });
+    } catch {
+      // Abaikan jika gagal update app_metadata, user_metadata sudah tersimpan
+    }
+  }
+
+  revalidatePath('/pengaturan');
+  revalidatePath('/(app)', 'layout');
+  revalidatePath('/', 'layout');
+
+  return { ok: true, data: academicConfig };
+}
+
+/**
+ * 3. Toggle Status Aktif / Nonaktif Akun Pengguna (Khusus ADMIN).
+ */
+export async function toggleUserStatusAction(
+  rawInput: unknown
+): Promise<ActionResult> {
+  const authCheck = await verifyActiveUser(true);
+  if (!authCheck.ok || !authCheck.authUser) {
+    return { ok: false, error: authCheck.error || 'Akses ditolak.' };
+  }
+
+  const parsed = toggleUserStatusSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  const { user_id, is_active } = parsed.data;
+
+  if (user_id === authCheck.authUser.userId && !is_active) {
+    return {
+      ok: false,
+      error: 'Anda tidak dapat menonaktifkan akun Anda sendiri yang sedang aktif.',
+    };
+  }
+
+  const supabase = await createClient();
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ is_active })
+    .eq('id', user_id);
+
+  if (updateError) {
+    return { ok: false, error: mapDbError(updateError) };
+  }
+
+  revalidatePath('/pengaturan');
+  revalidatePath('/(app)', 'layout');
+
+  return { ok: true };
+}
+
+/**
+ * 4. Reset Kata Sandi Pengguna oleh ADMIN (Khusus ADMIN).
+ */
+export async function adminResetPasswordAction(
+  rawInput: unknown
+): Promise<ActionResult> {
+  const authCheck = await verifyActiveUser(true);
+  if (!authCheck.ok || !authCheck.authUser) {
+    return { ok: false, error: authCheck.error || 'Akses ditolak.' };
+  }
+
+  const parsed = adminResetPasswordSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  const { user_id, new_password } = parsed.data;
+  const adminClient = createAdminClient();
+
+  if (adminClient) {
+    const { error } = await adminClient.auth.admin.updateUserById(user_id, {
+      password: new_password,
+    });
+    if (error) {
+      return {
+        ok: false,
+        error: 'Gagal mereset kata sandi pengguna. Pastikan kata sandi memenuhi syarat keamanan.',
+      };
+    }
+  } else if (user_id === authCheck.authUser.userId) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.updateUser({
+      password: new_password,
+    });
+    if (error) {
+      return {
+        ok: false,
+        error: 'Gagal mereset kata sandi pengguna.',
+      };
+    }
+  } else {
+    return {
+      ok: false,
+      error: 'Konfigurasi kunci layanan admin belum tersedia untuk mereset akun pengguna lain.',
+    };
+  }
+
+  revalidatePath('/pengaturan');
+  return { ok: true };
+}
+
+/**
+ * 5. Update Profil Pengguna Saat Ini (Bisa ADMIN & USTADZ).
  */
 export async function updateUserProfileAction(
   rawInput: unknown
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { ok: false, error: 'Sesi Anda telah berakhir. Silakan masuk kembali.' };
+  const authCheck = await verifyActiveUser(false);
+  if (!authCheck.ok || !authCheck.authUser) {
+    return { ok: false, error: authCheck.error || 'Sesi tidak valid.' };
   }
 
   const parsed = userProfileSchema.safeParse(rawInput);
@@ -105,6 +273,7 @@ export async function updateUserProfileAction(
   }
 
   const { full_name, phone } = parsed.data;
+  const supabase = await createClient();
 
   const { error: updateError } = await supabase
     .from('profiles')
@@ -112,7 +281,7 @@ export async function updateUserProfileAction(
       full_name,
       phone: phone || null,
     })
-    .eq('id', user.id);
+    .eq('id', authCheck.authUser.userId);
 
   if (updateError) {
     return { ok: false, error: mapDbError(updateError) };
@@ -126,24 +295,28 @@ export async function updateUserProfileAction(
 }
 
 /**
- * Ganti Kata Sandi Akun Pengguna Saat Ini.
+ * 6. Ganti Kata Sandi Akun Pengguna Saat Ini (Bisa ADMIN & USTADZ).
  */
 export async function changePasswordAction(
   rawInput: unknown
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user || !user.email) {
-    return { ok: false, error: 'Sesi Anda telah berakhir. Silakan masuk kembali.' };
+  const authCheck = await verifyActiveUser(false);
+  if (!authCheck.ok || !authCheck.authUser) {
+    return { ok: false, error: authCheck.error || 'Sesi tidak valid.' };
   }
 
   const parsed = changePasswordSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !user.email) {
+    return { ok: false, error: 'Sesi Anda telah berakhir. Silakan masuk kembali.' };
   }
 
   const { current_password, new_password } = parsed.data;
@@ -175,4 +348,3 @@ export async function changePasswordAction(
 
   return { ok: true };
 }
-

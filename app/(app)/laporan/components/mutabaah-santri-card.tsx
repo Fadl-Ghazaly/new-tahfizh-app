@@ -7,9 +7,15 @@ import { formatPrintDateIndonesian } from '@/lib/formatters';
 
 export interface MutabaahSantriCardProps {
   cardData: StudentMutabaahCardData;
+  schoolName?: string;
+  logoUrl?: string | null;
 }
 
-export function MutabaahSantriCard({ cardData }: MutabaahSantriCardProps) {
+export function MutabaahSantriCard({
+  cardData,
+  schoolName = 'PESANTREN DARUL ILMI',
+  logoUrl = null,
+}: MutabaahSantriCardProps) {
   const { student, period, progress, attendance, chartData, records } = cardData;
 
   const typeBadgeVariant = (type: string) => {
@@ -29,8 +35,14 @@ export function MutabaahSantriCard({ cardData }: MutabaahSantriCardProps) {
     <div className="bg-card rounded-2xl border shadow-sm p-6 space-y-6 print:w-full print:p-0 print:text-black print:shadow-none print:border-none">
       {/* KOP / Header Laporan Resmi */}
       <div className="border-b-2 border-black/20 print:border-b-2 print:border-black pb-4 text-center space-y-1">
+        {logoUrl && (
+          <div className="flex justify-center pb-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt="Logo Pesantren" className="h-12 w-12 object-contain" />
+          </div>
+        )}
         <h2 className="text-xl font-bold tracking-tight text-foreground uppercase print:text-black">
-          PESANTREN DARUL ILMI
+          {schoolName}
         </h2>
         <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold print:text-black">
           Lembaga Tahfizh Al-Qur&apos;an &bull; Mushaf Madinah Standar 300 Baris / Juz
