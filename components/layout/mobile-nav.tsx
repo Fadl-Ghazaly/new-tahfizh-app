@@ -101,6 +101,7 @@ export function MobileNav({ role, userName }: MobileNavProps) {
               <Link
                 key={href}
                 href={href}
+                prefetch={true}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex min-w-14 flex-col items-center justify-center gap-1 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl',
@@ -180,6 +181,7 @@ export function MobileNav({ role, userName }: MobileNavProps) {
                 <Link
                   key={href}
                   href={href}
+                  prefetch={true}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
                     'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',

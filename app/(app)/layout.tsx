@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireUser } from '@/lib/auth/require-user';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { MobileNav } from '@/components/layout/mobile-nav';
@@ -15,43 +16,28 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   await connection();
-  const supabase = await createClient();
 
-  // 1. Verifikasi pengguna — gunakan getUser(), bukan getSession()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  // 1. Verifikasi pengguna & profil menggunakan utilitas cache request
+  let authUser;
+  try {
+    authUser = await requireUser();
+  } catch {
     redirect('/login');
   }
 
-  // 2. Ambil profil dari tabel profiles (role selalu dari sini)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, role, is_active')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile) {
-    // Profil belum ada (baru daftar atau inkonsisten data)
-    await supabase.auth.signOut();
-    redirect('/login');
-  }
-
-  if (profile.is_active === false) {
+  if (!authUser.isActive) {
+    const supabase = await createClient();
     await supabase.auth.signOut();
     redirect('/login?error=inactive');
   }
 
-  // 3. Ambil pengaturan sekolah via cache
+  // 2. Ambil pengaturan sekolah via cache
   const settings = await getPublicSchoolSettings();
   const schoolName = settings.school_name;
   const logoUrl = settings.logo_url;
 
-  const userName = profile.full_name;
-  const role = profile.role as string;
+  const userName = authUser.fullName || '';
+  const role = authUser.role;
 
   return (
     <div className="min-h-screen bg-background">

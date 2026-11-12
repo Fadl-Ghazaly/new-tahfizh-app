@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import type { Role } from '@/lib/setoran/rules';
 
@@ -7,9 +8,12 @@ export interface AuthenticatedUser {
   role: Role;
   isActive: boolean;
   teacherId: string | null;
+  fullName?: string;
+  email?: string;
+  phone?: string | null;
 }
 
-export async function requireUser(): Promise<AuthenticatedUser> {
+export const requireUser = cache(async (): Promise<AuthenticatedUser> => {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -19,7 +23,7 @@ export async function requireUser(): Promise<AuthenticatedUser> {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, is_active')
+    .select('full_name, phone, role, is_active')
     .eq('id', user.id)
     .single();
 
@@ -45,5 +49,8 @@ export async function requireUser(): Promise<AuthenticatedUser> {
     role: profile.role as Role,
     isActive: Boolean(profile.is_active),
     teacherId,
+    fullName: profile.full_name || '',
+    email: user.email || '',
+    phone: profile.phone || null,
   };
-}
+});

@@ -49,6 +49,7 @@ export function NavLinks({ role, variant = 'sidebar', onNavigate }: NavLinksProp
           <Link
             key={href}
             href={href}
+            prefetch={true}
             aria-current={isActive ? 'page' : undefined}
             onClick={onNavigate}
             className={cn(

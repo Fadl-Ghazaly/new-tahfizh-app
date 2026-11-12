@@ -1,5 +1,6 @@
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireUser } from '@/lib/auth/require-user';
 import { parseSetoranParams } from '@/lib/validators/setoran-params';
 import { EmptyState } from '@/components/layout/empty-state';
 import { BookOpenCheck } from 'lucide-react';
@@ -25,8 +26,11 @@ export async function SetoranContent({
   const todayIso = new Date().toISOString().slice(0, 10);
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  // 1. Auth & Profile Check via shared in-memory request cache
+  let authUser;
+  try {
+    authUser = await requireUser();
+  } catch {
     return (
       <EmptyState
         icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
@@ -36,13 +40,7 @@ export async function SetoranContent({
     );
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, is_active')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !profile.is_active) {
+  if (!authUser.isActive) {
     return (
       <EmptyState
         icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
@@ -52,26 +50,17 @@ export async function SetoranContent({
     );
   }
 
-  const role = profile.role as 'ADMIN' | 'USTADZ';
-  let teacherId: string | null = null;
+  const role = authUser.role;
+  const teacherId = authUser.teacherId;
 
-  if (role === 'USTADZ') {
-    const { data: teacher } = await supabase
-      .from('teachers')
-      .select('id, is_active')
-      .eq('profile_id', user.id)
-      .single();
-
-    if (!teacher || !teacher.is_active) {
-      return (
-        <EmptyState
-          icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
-          title="Akun Belum Terhubung"
-          description="Akun Anda belum terhubung dengan data ustadz aktif, hubungi admin."
-        />
-      );
-    }
-    teacherId = teacher.id;
+  if (role === 'USTADZ' && !teacherId) {
+    return (
+      <EmptyState
+        icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
+        title="Akun Belum Terhubung"
+        description="Akun Anda belum terhubung dengan data ustadz aktif, hubungi admin."
+      />
+    );
   }
 
   const validated = parseSetoranParams(rawParams, role, todayIso);

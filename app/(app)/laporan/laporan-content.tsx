@@ -23,6 +23,7 @@ import {
 } from '@/lib/laporan/types';
 import { barisKeJuzHalaman, formatCapaian, persenProgress } from '@/lib/tahfizh';
 import { getPublicSchoolSettings } from '@/lib/settings';
+import { requireUser } from '@/lib/auth/require-user';
 import { LaporanClient } from './laporan-client';
 
 export async function LaporanContent({
@@ -34,9 +35,11 @@ export async function LaporanContent({
   const rawParams = await searchParams;
   const supabase = await createClient();
 
-  // 1. Auth & Profile Check
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  // 1. Auth & Profile Check via shared in-memory request cache
+  let authUser;
+  try {
+    authUser = await requireUser();
+  } catch {
     return (
       <EmptyState
         icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
@@ -46,13 +49,7 @@ export async function LaporanContent({
     );
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, is_active')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !profile.is_active) {
+  if (!authUser.isActive) {
     return (
       <EmptyState
         icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
@@ -62,26 +59,17 @@ export async function LaporanContent({
     );
   }
 
-  const role = profile.role as 'ADMIN' | 'USTADZ';
-  let teacherId: string | null = null;
+  const role = authUser.role;
+  const teacherId = authUser.teacherId;
 
-  if (role === 'USTADZ') {
-    const { data: teacher } = await supabase
-      .from('teachers')
-      .select('id, is_active')
-      .eq('profile_id', user.id)
-      .single();
-
-    if (!teacher || !teacher.is_active) {
-      return (
-        <EmptyState
-          icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
-          title="Akun Belum Terhubung"
-          description="Akun Anda belum terhubung dengan data ustadz aktif, hubungi admin."
-        />
-      );
-    }
-    teacherId = teacher.id;
+  if (role === 'USTADZ' && !teacherId) {
+    return (
+      <EmptyState
+        icon={<BookOpenCheck className="h-8 w-8 text-primary" />}
+        title="Akun Belum Terhubung"
+        description="Akun Anda belum terhubung dengan data ustadz aktif, hubungi admin."
+      />
+    );
   }
 
   // 2. Validate query params

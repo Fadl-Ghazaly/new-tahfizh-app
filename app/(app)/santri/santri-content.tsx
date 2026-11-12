@@ -1,5 +1,6 @@
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireUser } from '@/lib/auth/require-user';
 import { parseListParams } from '@/lib/validators/list-params';
 import { SantriClient, ClassOption, HalaqahOption, StudentRow } from './santri-client';
 
@@ -14,35 +15,20 @@ export async function SantriContent({
 
   const supabase = await createClient();
 
-  // 1. Fetch user role & linked teacher (if USTADZ)
-  const { data: { user } } = await supabase.auth.getUser();
+  // 1. Fetch user role & linked teacher via shared in-memory request cache
   let isAdmin = false;
   let role: 'ADMIN' | 'USTADZ' = 'USTADZ';
   let ustadzTeacherId: string | null = null;
 
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.is_active) {
-      role = profile.role as 'ADMIN' | 'USTADZ';
+  try {
+    const authUser = await requireUser();
+    if (authUser.isActive) {
+      role = authUser.role;
       isAdmin = role === 'ADMIN';
+      ustadzTeacherId = authUser.teacherId;
     }
-
-    if (role === 'USTADZ') {
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('id, is_active')
-        .eq('profile_id', user.id)
-        .maybeSingle();
-
-      if (teacher && teacher.is_active) {
-        ustadzTeacherId = teacher.id;
-      }
-    }
+  } catch {
+    // Sesi ditangani oleh layout
   }
 
   // 2. Fetch active classes & halaqahs

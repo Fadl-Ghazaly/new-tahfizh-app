@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireUser } from '@/lib/auth/require-user';
 import { EmptyState } from '@/components/layout/empty-state';
 import { Settings as SettingsIcon } from 'lucide-react';
 import {
@@ -14,12 +15,11 @@ export async function PengaturanContent() {
   await connection();
   const supabase = await createClient();
 
-  // 1. Ambil data user yang sedang login
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  // 1. Auth & Profile Check via shared in-memory request cache
+  let authUser;
+  try {
+    authUser = await requireUser();
+  } catch {
     return (
       <EmptyState
         icon={<SettingsIcon className="h-8 w-8 text-primary" />}
@@ -29,14 +29,7 @@ export async function PengaturanContent() {
     );
   }
 
-  // 2. Ambil profil user
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, full_name, phone, role, is_active')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !profile.is_active) {
+  if (!authUser.isActive) {
     return (
       <EmptyState
         icon={<SettingsIcon className="h-8 w-8 text-primary" />}
@@ -46,9 +39,9 @@ export async function PengaturanContent() {
     );
   }
 
-  const role = profile.role as 'ADMIN' | 'USTADZ';
+  const role = authUser.role;
 
-  // 3. Ambil data pengaturan sekolah
+  // 2. Ambil data pengaturan sekolah
   const { data: settingsData } = await supabase
     .from('school_settings')
     .select('school_name, logo_url, theme')
@@ -62,16 +55,17 @@ export async function PengaturanContent() {
   };
 
   const userProfile = {
-    id: user.id,
-    fullName: profile.full_name || '',
-    email: user.email || '',
-    phone: profile.phone || '',
+    id: authUser.userId,
+    fullName: authUser.fullName || '',
+    email: authUser.email || '',
+    phone: authUser.phone || '',
   };
 
-  // 4. Ambil konfigurasi akademik & daftar pengguna (khusus ADMIN)
+  // 3. Ambil konfigurasi akademik & daftar pengguna (khusus ADMIN)
   let academicSettings: AcademicSettingsInput = { ...DEFAULT_ACADEMIC_SETTINGS };
+  const { data: { user } } = await supabase.auth.getUser();
   const rawUserMetaAcademic =
-    user.app_metadata?.academic_config ?? user.user_metadata?.academic_config;
+    user?.app_metadata?.academic_config ?? user?.user_metadata?.academic_config;
   const parsedAcademic = academicSettingsSchema.safeParse(rawUserMetaAcademic);
   if (parsedAcademic.success) {
     academicSettings = parsedAcademic.data;
@@ -92,10 +86,12 @@ export async function PengaturanContent() {
     >();
 
     // Fallback untuk akun sendiri bila service role tidak tersedia
-    authUserMap.set(user.id, {
-      email: user.email || '-',
-      lastSignInAt: user.last_sign_in_at || null,
-    });
+    if (user) {
+      authUserMap.set(user.id, {
+        email: user.email || '-',
+        lastSignInAt: user.last_sign_in_at || null,
+      });
+    }
 
     const adminClient = createAdminClient();
     if (adminClient) {

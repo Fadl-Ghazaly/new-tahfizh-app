@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireUser } from '@/lib/auth/require-user';
 import { parseListParams } from '@/lib/validators/list-params';
 import { normalizeHalaqahRelation } from '@/lib/validators/ustadz-rules';
 import { buildUstadzEmailFromName } from '@/lib/ustadz/provision-email';
@@ -17,16 +18,20 @@ export async function UstadzContent({
 
   const supabase = await createClient();
 
-  // 1. Fetch user role
-  const { data: { user } } = await supabase.auth.getUser();
+  // 1. Fetch user role via shared in-memory request cache
   let isAdmin = false;
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', user.id)
-      .single();
-    isAdmin = profile?.role === 'ADMIN' && profile?.is_active === true;
+  let userId: string | null = null;
+  let userEmail: string | null = null;
+
+  try {
+    const authUser = await requireUser();
+    if (authUser.isActive) {
+      isAdmin = authUser.role === 'ADMIN';
+      userId = authUser.userId;
+      userEmail = authUser.email || null;
+    }
+  } catch {
+    // Sesi ditangani layout
   }
 
   // 2. Fetch classes
@@ -42,8 +47,8 @@ export async function UstadzContent({
     .select('*, halaqahs(id, name, class_id, is_active, classes(name))', { count: 'exact' });
 
   // RBAC: Hanya ADMIN yang melihat seluruh data ustadz secara rinci; USTADZ hanya melihat profilnya sendiri
-  if (!isAdmin && user) {
-    query = query.eq('profile_id', user.id);
+  if (!isAdmin && userId) {
+    query = query.eq('profile_id', userId);
   }
 
   if (!validated.showInactive || !isAdmin) {
@@ -81,8 +86,8 @@ export async function UstadzContent({
 
   // 4. Resolve email accounts from Supabase Auth
   const emailByProfileId = new Map<string, string>();
-  if (user?.email) {
-    emailByProfileId.set(user.id, user.email);
+  if (userEmail && userId) {
+    emailByProfileId.set(userId, userEmail);
   }
 
   const adminClient = createAdminClient();
