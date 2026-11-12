@@ -25,18 +25,19 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Khusus /pengaturan, cek jika role bukan ADMIN
-  if (user && path.startsWith('/pengaturan')) {
+  // Cek apakah akun dinonaktifkan oleh administrator
+  if (user && !isPublicRoute) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, is_active')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'ADMIN') {
-       const redirectUrl = new URL('/dashboard', request.url)
-       redirectUrl.searchParams.set('error', 'unauthorized')
-       return NextResponse.redirect(redirectUrl)
+    if (profile && profile.is_active === false) {
+      await supabase.auth.signOut()
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('error', 'inactive')
+      return NextResponse.redirect(redirectUrl)
     }
   }
 

@@ -9,12 +9,12 @@ interface TopbarProps {
 
 export function Topbar({ userName, role, schoolName }: TopbarProps) {
   /** Ambil inisial nama untuk avatar */
-  const initials = userName
-    .split(' ')
+  const initials = (userName.trim() || 'User')
+    .split(/\s+/)
     .slice(0, 2)
-    .map((w) => w[0])
+    .map((w) => w[0] || '')
     .join('')
-    .toUpperCase();
+    .toUpperCase() || 'U';
 
   return (
     <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card/90 px-4 shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-md md:left-72 md:px-6 print:hidden">

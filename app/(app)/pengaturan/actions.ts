@@ -287,6 +287,20 @@ export async function updateUserProfileAction(
     return { ok: false, error: mapDbError(updateError) };
   }
 
+  // Jika role adalah USTADZ yang terhubung ke data ustadz, sinkronkan nama & whatsapp ke tabel teachers
+  if (authCheck.authUser.role === 'USTADZ' && authCheck.authUser.teacherId) {
+    const adminClient = createAdminClient();
+    const writeClient = adminClient || supabase;
+    await writeClient
+      .from('teachers')
+      .update({
+        name: full_name,
+        ...(phone && phone.trim().length > 0 ? { whatsapp: phone.trim() } : {}),
+      })
+      .eq('id', authCheck.authUser.teacherId);
+    revalidatePath('/ustadz');
+  }
+
   revalidatePath('/pengaturan');
   revalidatePath('/(app)', 'layout');
   revalidatePath('/', 'layout');

@@ -15,6 +15,7 @@ import {
   updateAcademicSettingsAction,
   adminResetPasswordAction,
   updateSchoolSettingsAction,
+  updateUserProfileAction,
 } from '@/app/(app)/pengaturan/actions';
 
 // Mock server-only
@@ -47,8 +48,12 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 
 const mockUpdateUserById = vi.fn();
+const mockAdminFrom = vi.fn(() => ({
+  update: mockUpdate,
+}));
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(() => ({
+    from: mockAdminFrom,
     auth: {
       admin: {
         updateUserById: mockUpdateUserById,
@@ -317,6 +322,27 @@ describe('Pengaturan Validators & Server Actions Tests', () => {
 
       expect(res.ok).toBe(false);
       expect(res.error).toContain('Hanya Admin');
+    });
+
+    it('mengizinkan USTADZ memperbarui profilnya sendiri dan menyinkronkan data ustadz', async () => {
+      vi.spyOn(requireUserModule, 'requireUser').mockResolvedValueOnce({
+        userId: targetUuid,
+        role: 'USTADZ',
+        isActive: true,
+        teacherId: 't1',
+      });
+      mockUpdateEq.mockResolvedValue({ error: null });
+
+      const res = await updateUserProfileAction({
+        full_name: 'Ust. Ahmad Fauzi Baru',
+        phone: '081299998888',
+      });
+
+      expect(res.ok).toBe(true);
+      expect(mockUpdate).toHaveBeenCalledWith({
+        full_name: 'Ust. Ahmad Fauzi Baru',
+        phone: '081299998888',
+      });
     });
   });
 });

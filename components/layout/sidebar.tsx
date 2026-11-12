@@ -21,6 +21,7 @@ export function Sidebar({ role, schoolName, logoUrl }: SidebarProps) {
             alt="Logo pesantren"
             width={40}
             height={40}
+            unoptimized
             className="h-10 w-10 rounded-xl object-contain"
           />
         ) : (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useRef, useState, useSyncExternalStore, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -112,6 +112,8 @@ export interface PengaturanClientProps {
 
 type TabType = 'profile' | 'users' | 'school' | 'academic';
 
+const emptySubscribe = () => () => {};
+
 function formatLastLogin(iso: string | null): string {
   if (!iso) return 'Belum pernah';
   const d = new Date(iso);
@@ -122,6 +124,7 @@ function formatLastLogin(iso: string | null): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
   });
 }
 
@@ -145,6 +148,11 @@ export function PengaturanClient({
   managedUsers,
 }: PengaturanClientProps) {
   const router = useRouter();
+  const isHydrated = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -444,6 +452,31 @@ export function PengaturanClient({
     return list;
   })();
 
+  if (!isHydrated) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-pulse">
+        <div className="md:col-span-1 space-y-2">
+          <div className="p-4 bg-card rounded-xl border shadow-sm space-y-2">
+            <div className="h-10 bg-muted rounded-lg" />
+            <div className="h-10 bg-muted rounded-lg" />
+            <div className="h-10 bg-muted rounded-lg" />
+            <div className="h-10 bg-muted rounded-lg" />
+          </div>
+        </div>
+        <div className="md:col-span-3 space-y-6">
+          <div className="p-6 bg-card rounded-xl border shadow-sm space-y-4">
+            <div className="h-5 w-48 bg-muted rounded" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="h-10 bg-muted rounded" />
+              <div className="h-10 bg-muted rounded" />
+            </div>
+            <div className="h-10 w-36 bg-muted rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
       {/* Sidebar Navigasi Tab Pengaturan */}
@@ -451,6 +484,7 @@ export function PengaturanClient({
         <div className="p-4 bg-card rounded-xl border shadow-sm space-y-1">
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => setActiveTab('profile')}
             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
               activeTab === 'profile'
@@ -466,6 +500,7 @@ export function PengaturanClient({
             <>
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={() => setActiveTab('users')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
                   activeTab === 'users'
@@ -479,6 +514,7 @@ export function PengaturanClient({
 
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={() => setActiveTab('school')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
                   activeTab === 'school'
@@ -492,6 +528,7 @@ export function PengaturanClient({
 
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={() => setActiveTab('academic')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
                   activeTab === 'academic'

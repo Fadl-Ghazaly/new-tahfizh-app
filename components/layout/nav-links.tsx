@@ -26,7 +26,7 @@ const navItems: NavItem[] = [
   { label: 'Data Ustadz', href: '/ustadz', Icon: GraduationCap },
   { label: 'Input Setoran', href: '/setoran', Icon: BookOpenCheck },
   { label: 'Laporan', href: '/laporan', Icon: BarChart3 },
-  { label: 'Pengaturan', href: '/pengaturan', Icon: Settings, adminOnly: true },
+  { label: 'Pengaturan', href: '/pengaturan', Icon: Settings },
 ];
 
 interface NavLinksProps {

@@ -36,9 +36,16 @@ const primaryNav = [
   { label: 'Laporan', href: '/laporan', Icon: BarChart3 },
 ];
 
-const moreNav = [
+interface MoreNavItem {
+  label: string;
+  href: string;
+  Icon: typeof GraduationCap;
+  adminOnly?: boolean;
+}
+
+const moreNav: MoreNavItem[] = [
   { label: 'Data Ustadz', href: '/ustadz', Icon: GraduationCap },
-  { label: 'Pengaturan', href: '/pengaturan', Icon: Settings, adminOnly: true },
+  { label: 'Pengaturan', href: '/pengaturan', Icon: Settings },
 ];
 
 export function MobileNav({ role, userName }: MobileNavProps) {
@@ -54,12 +61,12 @@ export function MobileNav({ role, userName }: MobileNavProps) {
     }
   }, [pathname]);
 
-  const initials = userName
-    .split(' ')
+  const initials = (userName.trim() || 'User')
+    .split(/\s+/)
     .slice(0, 2)
-    .map((w) => w[0])
+    .map((w) => w[0] || '')
     .join('')
-    .toUpperCase();
+    .toUpperCase() || 'U';
 
   return (
     <>
